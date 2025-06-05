@@ -1,8 +1,7 @@
 <div align="center">
   <img src="docs/EAGLE.png" alt="EAGLE Logo" width="150px" height="150px">
   
-  # 🦅 EAGLE
-  ## Efficient Alignment of Generalized Latent Embeddings
+  # Efficient Alignment of Generalized Latent Embeddings
   
   *A unified multimodal survival prediction framework with interpretable attribution analysis*
   
