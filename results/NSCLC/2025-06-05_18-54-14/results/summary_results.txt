@@ -1,0 +1,6 @@
+Dataset: NSCLC
+Mean C-index: 0.6077 ± 0.0168
+Per-fold C-indices: [np.float64(0.603998096144693), np.float64(0.5955938212205621), np.float64(0.6029309141660851), np.float64(0.5956325301204819), np.float64(0.6405776846028418)]
+Number of patients: 580
+Number of events: 300.0
+Event rate: 51.72%

@@ -1,0 +1,6 @@
+Dataset: GBM
+Mean C-index: 0.6422 ± 0.0396
+Per-fold C-indices: [np.float64(0.6835164835164835), np.float64(0.6622516556291391), np.float64(0.6438679245283019), np.float64(0.6541019955654102), np.float64(0.5675)]
+Number of patients: 154
+Number of events: 147.0
+Event rate: 95.45%

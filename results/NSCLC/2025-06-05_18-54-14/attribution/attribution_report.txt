@@ -1,0 +1,27 @@
+Modality Attribution Analysis Report
+==================================================
+
+Dataset: NSCLC
+Number of patients analyzed: 580
+
+Average Modality Contributions:
+  - Imaging: 33.2%
+  - Text: 34.3%
+  - Clinical: 32.4%
+
+Correlation with Risk Score:
+  - Imaging: 0.079
+  - Text: 0.175
+  - Clinical: -0.209
+
+Average Contributions by Outcome:
+
+Censored (n=280):
+  - Imaging: 33.6%
+  - Text: 34.0%
+  - Clinical: 32.4%
+
+Death (n=300):
+  - Imaging: 32.9%
+  - Text: 34.7%
+  - Clinical: 32.4%

@@ -1,0 +1,6 @@
+Dataset: IPMN
+Mean C-index: 0.7130 ± 0.0523
+Per-fold C-indices: [np.float64(0.6557377049180327), np.float64(0.7817679558011049), np.float64(0.651685393258427), np.float64(0.7191601049868767), np.float64(0.7564102564102564)]
+Number of patients: 170
+Number of events: 83.0
+Event rate: 48.82%

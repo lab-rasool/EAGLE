@@ -1,0 +1,3 @@
+Dataset: NSCLC
+Timestamp: 2025-06-05_18-54-14
+Output directory: results/NSCLC/2025-06-05_18-54-14

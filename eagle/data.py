@@ -79,7 +79,7 @@ class DatasetConfig:
 # Preset configurations
 GBM_CONFIG = DatasetConfig(
     name="GBM",
-    data_path="/proj/rasool_lab_projects/Aakash/EAGLE/data/GBM.parquet",
+    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/GBM.parquet",
     imaging_modality="MRI",
     imaging_embedding_dim=1000,
     imaging_num_slices=155,
@@ -101,7 +101,7 @@ GBM_CONFIG = DatasetConfig(
 
 IPMN_CONFIG = DatasetConfig(
     name="IPMN",
-    data_path="/proj/rasool_lab_projects/Aakash/EAGLE/data/IPMN.parquet",
+    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/IPMN_with_text.parquet",
     imaging_modality="CT",
     imaging_embedding_dim=1000,
     imaging_num_slices=190,  # Based on the shape we saw
@@ -121,7 +121,7 @@ IPMN_CONFIG = DatasetConfig(
 
 NSCLC_CONFIG = DatasetConfig(
     name="NSCLC",
-    data_path="/proj/rasool_lab_projects/Aakash/EAGLE/data/NSCLC.parquet",
+    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/NSCLC.parquet",
     imaging_modality="CT",
     imaging_embedding_dim=1024,
     text_embedding_dim=1024,

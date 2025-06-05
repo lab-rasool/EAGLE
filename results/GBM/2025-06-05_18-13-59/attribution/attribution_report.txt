@@ -1,0 +1,27 @@
+Modality Attribution Analysis Report
+==================================================
+
+Dataset: GBM
+Number of patients analyzed: 154
+
+Average Modality Contributions:
+  - Imaging: 40.4%
+  - Text: 46.5%
+  - Clinical: 13.1%
+
+Correlation with Risk Score:
+  - Imaging: 0.192
+  - Text: -0.220
+  - Clinical: 0.023
+
+Average Contributions by Outcome:
+
+Censored (n=7):
+  - Imaging: 40.9%
+  - Text: 47.0%
+  - Clinical: 12.1%
+
+Death (n=147):
+  - Imaging: 40.4%
+  - Text: 46.5%
+  - Clinical: 13.2%

@@ -1,0 +1,3 @@
+Dataset: IPMN
+Timestamp: 2025-06-05_18-22-37
+Output directory: results/IPMN/2025-06-05_18-22-37
