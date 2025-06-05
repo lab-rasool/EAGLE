@@ -1,0 +1,22 @@
+{
+  "model": "Cox Proportional Hazards",
+  "dataset": "NSCLC",
+  "n_samples": 573,
+  "n_features_original": 3072,
+  "n_features_reduced": 100,
+  "n_components_pca": 100,
+  "penalizer": 0.1,
+  "l1_ratio": 0,
+  "successful_folds": 5,
+  "total_folds": 5,
+  "cv_scores": [
+    0.5006177415369409,
+    0.5515257628814407,
+    0.4641528156784917,
+    0.49613339777670373,
+    0.5061728395061729
+  ],
+  "mean_cindex": 0.5037205114759501,
+  "std_cindex": 0.028014817511488085,
+  "timestamp": "20250605_190854"
+}

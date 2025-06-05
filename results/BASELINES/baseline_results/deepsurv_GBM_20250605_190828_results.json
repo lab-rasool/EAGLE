@@ -1,0 +1,25 @@
+{
+  "model": "DeepSurv",
+  "dataset": "GBM",
+  "n_samples": 154,
+  "n_features": 3048,
+  "hidden_dims": [
+    512,
+    256,
+    128
+  ],
+  "dropout": 0.3,
+  "n_epochs": 100,
+  "batch_size": 32,
+  "learning_rate": 0.0001,
+  "cv_scores": [
+    0.5340659340659341,
+    0.5562913907284768,
+    0.6721698113207547,
+    0.6496674057649667,
+    0.6475
+  ],
+  "mean_cindex": 0.6119389083760265,
+  "std_cindex": 0.055635669800026405,
+  "timestamp": "20250605_190828"
+}

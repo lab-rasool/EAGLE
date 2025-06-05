@@ -1,0 +1,18 @@
+{
+  "model": "Random Survival Forest",
+  "dataset": "IPMN",
+  "n_samples": 170,
+  "n_features": 3048,
+  "n_estimators": 200,
+  "max_depth": null,
+  "cv_scores": [
+    0.3524590163934426,
+    0.5082872928176796,
+    0.43258426966292135,
+    0.48293963254593175,
+    0.33589743589743587
+  ],
+  "mean_cindex": 0.42243352946348234,
+  "std_cindex": 0.06858545427123701,
+  "timestamp": "20250605_190818"
+}

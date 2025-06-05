@@ -1,0 +1,18 @@
+{
+  "model": "Random Survival Forest",
+  "dataset": "GBM",
+  "n_samples": 154,
+  "n_features": 3048,
+  "n_estimators": 200,
+  "max_depth": null,
+  "cv_scores": [
+    0.46373626373626375,
+    0.5364238410596026,
+    0.36792452830188677,
+    0.35033259423503327,
+    0.3475
+  ],
+  "mean_cindex": 0.41318344546655733,
+  "std_cindex": 0.07490887348337867,
+  "timestamp": "20250605_190816"
+}

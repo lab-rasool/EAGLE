@@ -1,0 +1,22 @@
+{
+  "model": "Cox Proportional Hazards",
+  "dataset": "IPMN",
+  "n_samples": 170,
+  "n_features_original": 3048,
+  "n_features_reduced": 100,
+  "n_components_pca": 100,
+  "penalizer": 0.1,
+  "l1_ratio": 0,
+  "successful_folds": 5,
+  "total_folds": 5,
+  "cv_scores": [
+    0.6229508196721312,
+    0.5994475138121547,
+    0.5337078651685393,
+    0.5380577427821522,
+    0.5641025641025641
+  ],
+  "mean_cindex": 0.5716533011075082,
+  "std_cindex": 0.03472602755245002,
+  "timestamp": "20250605_190852"
+}
