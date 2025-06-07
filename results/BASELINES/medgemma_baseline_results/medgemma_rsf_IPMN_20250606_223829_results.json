@@ -1,0 +1,19 @@
+{
+  "model": "Random Survival Forest (MedGemma)",
+  "dataset": "IPMN",
+  "n_samples": 156,
+  "n_features": 2560,
+  "n_estimators": 200,
+  "max_depth": null,
+  "cv_scores": [
+    0.4413793103448276,
+    0.34195402298850575,
+    0.28343949044585987,
+    0.21621621621621623,
+    0.3987341772151899
+  ],
+  "mean_cindex": 0.33634464344211984,
+  "std_cindex": 0.08023215634146465,
+  "timestamp": "20250606_223829",
+  "embedding_type": "MedGemma"
+}

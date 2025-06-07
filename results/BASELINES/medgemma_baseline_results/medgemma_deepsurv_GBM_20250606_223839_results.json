@@ -1,0 +1,28 @@
+{
+  "model": "DeepSurv (MedGemma)",
+  "dataset": "GBM",
+  "n_samples": 154,
+  "n_features": 2560,
+  "hidden_dims": [
+    512,
+    256,
+    128
+  ],
+  "dropout": 0.3,
+  "n_epochs": 100,
+  "batch_size": 32,
+  "learning_rate": 0.0001,
+  "successful_folds": 5,
+  "total_folds": 5,
+  "cv_scores": [
+    0.5835189309576837,
+    0.7190265486725663,
+    0.621978021978022,
+    0.5704057279236276,
+    0.6009389671361502
+  ],
+  "mean_cindex": 0.61917363933361,
+  "std_cindex": 0.052840398840817156,
+  "timestamp": "20250606_223839",
+  "embedding_type": "MedGemma"
+}

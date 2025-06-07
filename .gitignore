@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+results/BASELINES/data
+
 # C extensions
 *.so
 

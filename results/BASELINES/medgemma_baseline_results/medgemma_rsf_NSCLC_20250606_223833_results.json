@@ -1,0 +1,19 @@
+{
+  "model": "Random Survival Forest (MedGemma)",
+  "dataset": "NSCLC",
+  "n_samples": 573,
+  "n_features": 2560,
+  "n_estimators": 200,
+  "max_depth": null,
+  "cv_scores": [
+    0.3936249073387695,
+    0.27613806903451726,
+    0.31332175638799303,
+    0.305703238279362,
+    0.3449074074074074
+  ],
+  "mean_cindex": 0.32673907568960986,
+  "std_cindex": 0.03996697521731735,
+  "timestamp": "20250606_223833",
+  "embedding_type": "MedGemma"
+}

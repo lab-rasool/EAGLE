@@ -1,0 +1,23 @@
+{
+  "model": "Cox Proportional Hazards (MedGemma)",
+  "dataset": "IPMN",
+  "n_samples": 156,
+  "n_features_original": 2560,
+  "n_features_reduced": 100,
+  "n_components_pca": 100,
+  "penalizer": 0.1,
+  "l1_ratio": 0,
+  "successful_folds": 5,
+  "total_folds": 5,
+  "cv_scores": [
+    0.5310344827586206,
+    0.5172413793103449,
+    0.4968152866242038,
+    0.6036036036036037,
+    0.4272151898734177
+  ],
+  "mean_cindex": 0.5151819884340381,
+  "std_cindex": 0.05683206503491355,
+  "timestamp": "20250606_223907",
+  "embedding_type": "MedGemma"
+}

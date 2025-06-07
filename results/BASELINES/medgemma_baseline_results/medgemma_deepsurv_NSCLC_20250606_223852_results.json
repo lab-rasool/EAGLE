@@ -1,0 +1,28 @@
+{
+  "model": "DeepSurv (MedGemma)",
+  "dataset": "NSCLC",
+  "n_samples": 573,
+  "n_features": 2560,
+  "hidden_dims": [
+    512,
+    256,
+    128
+  ],
+  "dropout": 0.3,
+  "n_epochs": 100,
+  "batch_size": 32,
+  "learning_rate": 0.0001,
+  "successful_folds": 5,
+  "total_folds": 5,
+  "cv_scores": [
+    0.6987892265875958,
+    0.8026513256628314,
+    0.7405110394443066,
+    0.7237796036732721,
+    0.7471707818930041
+  ],
+  "mean_cindex": 0.7425803954522021,
+  "std_cindex": 0.03436570028495491,
+  "timestamp": "20250606_223852",
+  "embedding_type": "MedGemma"
+}
