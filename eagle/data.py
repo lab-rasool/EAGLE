@@ -79,7 +79,7 @@ class DatasetConfig:
 # Preset configurations
 GBM_CONFIG = DatasetConfig(
     name="GBM",
-    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/GBM.parquet",
+    data_path="/mnt/f/Projects/EAGLE/data/GBM/unimodal.parquet",
     imaging_modality="MRI",
     imaging_embedding_dim=1000,
     imaging_num_slices=155,
@@ -101,7 +101,7 @@ GBM_CONFIG = DatasetConfig(
 
 IPMN_CONFIG = DatasetConfig(
     name="IPMN",
-    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/IPMN_with_text.parquet",
+    data_path="/mnt/f/Projects/EAGLE/data/IPMN/unimodal.parquet",
     imaging_modality="CT",
     imaging_embedding_dim=1000,
     imaging_num_slices=190,  # Based on the shape we saw
@@ -121,7 +121,94 @@ IPMN_CONFIG = DatasetConfig(
 
 NSCLC_CONFIG = DatasetConfig(
     name="NSCLC",
-    data_path="/proj/rasool_lab_projects/Aakash/ARCHIVE/data/NSCLC.parquet",
+    data_path="/mnt/f/Projects/EAGLE/data/NSCLC/unimodal.parquet",
+    imaging_modality="CT",
+    imaging_embedding_dim=1024,
+    text_embedding_dim=1024,
+    has_treatment_text=False,
+    clinical_features=[
+        "AGE_AT_DIAGNOSIS_NUM",
+        "RACE_CR_SRC_DESC_1",
+        "ETHNICITY_SRC_DESC",
+        "HISTOLOGY_DESC",
+        "STAGE_CLINICAL_TNM_T_DESC",
+        "STAGE_CLINICAL_TNM_N_DESC",
+        "STAGE_CLINICAL_TNM_M_DESC",
+        "STAGE_PATHOLOGICAL_TNM_T_DESC",
+        "STAGE_PATHOLOGICAL_TNM_N_DESC",
+        "STAGE_PATHOLOGICAL_TNM_M_DESC",
+        "DERIVED_TOBACCO_SMOKING_STATUS_DESC",
+    ],
+    categorical_features=[
+        "RACE_CR_SRC_DESC_1",
+        "ETHNICITY_SRC_DESC",
+        "HISTOLOGY_DESC",
+        "STAGE_CLINICAL_TNM_T_DESC",
+        "STAGE_CLINICAL_TNM_N_DESC",
+        "STAGE_CLINICAL_TNM_M_DESC",
+        "STAGE_PATHOLOGICAL_TNM_T_DESC",
+        "STAGE_PATHOLOGICAL_TNM_N_DESC",
+        "STAGE_PATHOLOGICAL_TNM_M_DESC",
+        "DERIVED_TOBACCO_SMOKING_STATUS_DESC",
+    ],
+    numerical_features=["AGE_AT_DIAGNOSIS_NUM"],
+    survival_time_col="SURVIVAL_TIME_IN_MONTHS",
+    event_col="event",
+    event_positive_value=1,
+    imaging_col="ct_contrast_embeddings",
+    imaging_shape_col="ct_contrast_embedding_shape",
+    radiology_embedding_col="clinical_embeddings",
+    pathology_embedding_col="clinical_embeddings",
+    imaging_col_secondary="ct_wo_contrast_embeddings",
+    imaging_shape_col_secondary="ct_wo_contrast_embedding_shape",
+)
+
+# MedGemma configurations
+GBM_MEDGEMMA_CONFIG = DatasetConfig(
+    name="GBM",
+    data_path="/mnt/f/Projects/EAGLE/data/GBM/medgemma.parquet",
+    imaging_modality="MRI",
+    imaging_embedding_dim=1000,
+    imaging_num_slices=155,
+    has_treatment_text=True,
+    clinical_features=[
+        "age_at_diagnosis_num",
+        "gender_src_desc",
+        "survival_time_in_months",
+    ],
+    survival_time_col="survival_time_in_months",
+    event_col="vital_status_desc",
+    event_positive_value="DEAD",
+    imaging_col="mri_embeddings",
+    imaging_shape_col="mri_embedding_shape",
+    radiology_embedding_col="radiology_report_embeddings",
+    pathology_embedding_col="pathology_report_embeddings",
+    treatment_embedding_col="treatment_embeddings",
+)
+
+IPMN_MEDGEMMA_CONFIG = DatasetConfig(
+    name="IPMN",
+    data_path="/mnt/f/Projects/EAGLE/data/IPMN/medgemma.parquet",
+    imaging_modality="CT",
+    imaging_embedding_dim=1000,
+    imaging_num_slices=190,
+    imaging_aggregation="mean",
+    has_treatment_text=False,
+    clinical_features=["bmi", "serum_ca_19.9", "histology", "grade", "smoking_status"],
+    categorical_features=["histology", "grade", "smoking_status"],
+    numerical_features=["bmi", "serum_ca_19.9"],
+    survival_time_col="survival_time_days",
+    event_col="vital_status",
+    event_positive_value="DEAD",
+    imaging_col="ct_embeddings",
+    imaging_shape_col="ct_embedding_shape",
+    radiology_embedding_col="radiology_embeddings",
+    pathology_embedding_col="pathology_embeddings",
+)
+
+NSCLC_MEDGEMMA_CONFIG = DatasetConfig(
+    name="NSCLC",
+    data_path="/mnt/f/Projects/EAGLE/data/NSCLC/medgemma.parquet",
     imaging_modality="CT",
     imaging_embedding_dim=1024,
     text_embedding_dim=1024,

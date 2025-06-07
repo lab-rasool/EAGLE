@@ -386,3 +386,53 @@ class UnifiedSurvivalModel(nn.Module):
             'text': text_encoded,
             'clinical': clinical_encoded
         }
+    
+    def get_fused_features(self, imaging_features, clinical_features, text_embeddings):
+        """Extract fused features without final prediction layers"""
+        # Get batch size and device
+        batch_size = imaging_features.shape[0]
+        device = imaging_features.device
+        
+        # Encode each modality
+        imaging_encoded = self.imaging_encoder(imaging_features)
+        text_encoded = self._encode_text(text_embeddings, batch_size, device)
+        clinical_encoded = self.clinical_encoder(clinical_features)
+        
+        # Project to common dimension
+        imaging_proj = self.imaging_projection(imaging_encoded).unsqueeze(1)
+        text_proj = self.text_projection(text_encoded).unsqueeze(1)
+        clinical_proj = self.clinical_projection(clinical_encoded).unsqueeze(1)
+        
+        # Apply cross-attention if enabled
+        if self.model_config.use_cross_attention:
+            # Create multimodal sequences for attention
+            img_text_sequence = torch.cat([imaging_proj, text_proj], dim=1)
+            img_clin_sequence = torch.cat([imaging_proj, clinical_proj], dim=1)
+            
+            # Apply attention fusion
+            img_text_attended = self.imaging_text_attention(img_text_sequence)
+            img_clin_attended = self.imaging_clinical_attention(img_clin_sequence)
+            
+            # Pool attended features
+            img_text_pooled = img_text_attended.mean(dim=1)
+            img_clin_pooled = img_clin_attended.mean(dim=1)
+            
+            # Combine attended features
+            fused_features = torch.cat(
+                [img_text_pooled, img_clin_pooled, clinical_proj.squeeze(1)], dim=1
+            )
+        else:
+            # Simple concatenation
+            fused_features = torch.cat(
+                [
+                    imaging_proj.squeeze(1),
+                    text_proj.squeeze(1),
+                    clinical_proj.squeeze(1),
+                ],
+                dim=1,
+            )
+        
+        # Apply fusion layers
+        fused = self.fusion_layers(fused_features)
+        
+        return fused

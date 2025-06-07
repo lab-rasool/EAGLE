@@ -1,294 +1,520 @@
 #!/usr/bin/env python
 """
-Example script showing how to use the EAGLE library with attribution analysis
+EAGLE: Efficient Alignment of Generalized Latent Embeddings
+Main script for training EAGLE models and running comparative analysis
 """
 
 import argparse
 import os
-from datetime import datetime
+import json
+import numpy as np
+import pandas as pd
+import torch
 from pathlib import Path
+from datetime import datetime
+import logging
+from typing import Dict, List, Tuple
+
+# Survival analysis imports
+from sksurv.ensemble import RandomSurvivalForest
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+# EAGLE imports
 from eagle import (
-    UnifiedPipeline,
-    ModelConfig,
-    GBM_CONFIG,
-    IPMN_CONFIG,
-    NSCLC_CONFIG,
-    plot_km_curves,
-    create_comprehensive_plots,
-    ModalityAttributionAnalyzer,
-    plot_modality_contributions,
-    plot_patient_level_attribution,
-    create_attribution_report,
+    UnifiedPipeline, UnifiedSurvivalModel, UnifiedSurvivalDataset,
+    UnifiedClinicalProcessor, UnifiedTrainer, UnifiedRiskStratification,
+    get_text_extractor, ModelConfig, DatasetConfig,
+    GBM_CONFIG, IPMN_CONFIG, NSCLC_CONFIG,
+    GBM_MEDGEMMA_CONFIG, IPMN_MEDGEMMA_CONFIG, NSCLC_MEDGEMMA_CONFIG,
+    plot_km_curves, create_comprehensive_plots,
+    ModalityAttributionAnalyzer, plot_modality_contributions,
+    plot_patient_level_attribution, create_attribution_report
+)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
 
-def create_output_directory(dataset_name: str, base_dir: str = "results") -> dict:
-    """Create organized output directory structure"""
-    # Create timestamp for this run
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+class BaselineModels:
+    """Baseline survival models for comparison"""
     
-    # Create directory structure
-    output_dir = Path(base_dir) / dataset_name / timestamp
+    @staticmethod
+    def run_rsf(X_train, y_train, X_test, y_test):
+        """Random Survival Forest"""
+        # Create structured array for sksurv
+        y_train_struct = np.array(
+            [(bool(e), t) for e, t in zip(y_train['event'], y_train['time'])],
+            dtype=[('event', bool), ('time', float)]
+        )
+        y_test_struct = np.array(
+            [(bool(e), t) for e, t in zip(y_test['event'], y_test['time'])],
+            dtype=[('event', bool), ('time', float)]
+        )
+        
+        # Train RSF
+        rsf = RandomSurvivalForest(
+            n_estimators=200,
+            min_samples_split=10,
+            min_samples_leaf=6,
+            max_features="sqrt",
+            n_jobs=-1,
+            random_state=42
+        )
+        rsf.fit(X_train, y_train_struct)
+        
+        # Get risk scores using cumulative hazard
+        median_time = np.median(y_test['time'])
+        chf = rsf.predict_cumulative_hazard_function(X_test)
+        risk_scores = np.array([chf_i(median_time) for chf_i in chf])
+        
+        # Calculate C-index
+        c_index = concordance_index_censored(
+            y_test_struct['event'], y_test_struct['time'], risk_scores
+        )[0]
+        
+        return c_index, risk_scores
     
-    # Create subdirectories
-    dirs = {
-        "base": output_dir,
-        "models": output_dir / "models",
-        "results": output_dir / "results",
-        "figures": output_dir / "figures",
-        "logs": output_dir / "logs",
-        "attribution": output_dir / "attribution"  # Add attribution directory
+    @staticmethod
+    def run_coxph(X_train, y_train, X_test, y_test):
+        """Cox Proportional Hazards"""
+        # Create structured array
+        y_train_struct = np.array(
+            [(bool(e), t) for e, t in zip(y_train['event'], y_train['time'])],
+            dtype=[('event', bool), ('time', float)]
+        )
+        y_test_struct = np.array(
+            [(bool(e), t) for e, t in zip(y_test['event'], y_test['time'])],
+            dtype=[('event', bool), ('time', float)]
+        )
+        
+        # Apply PCA if needed
+        if X_train.shape[1] > 30:
+            pca = PCA(n_components=30, random_state=42)
+            X_train_pca = pca.fit_transform(X_train)
+            X_test_pca = pca.transform(X_test)
+        else:
+            X_train_pca = X_train
+            X_test_pca = X_test
+        
+        # Train Cox model
+        try:
+            cox = CoxPHSurvivalAnalysis(alpha=0.1, n_iter=100)
+            cox.fit(X_train_pca, y_train_struct)
+            risk_scores = cox.predict(X_test_pca)
+            
+            c_index = concordance_index_censored(
+                y_test_struct['event'], y_test_struct['time'], risk_scores
+            )[0]
+            
+            return c_index, risk_scores
+        except Exception as e:
+            logging.warning(f"CoxPH failed: {e}")
+            return np.nan, np.zeros(len(X_test))
+    
+    @staticmethod
+    def run_deepsurv(X_train, y_train, X_test, y_test):
+        """Simple DeepSurv implementation"""
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Convert to tensors
+        X_train_t = torch.FloatTensor(X_train).to(device)
+        X_test_t = torch.FloatTensor(X_test).to(device)
+        
+        # Simple neural network
+        class DeepSurvNet(torch.nn.Module):
+            def __init__(self, input_dim):
+                super().__init__()
+                self.net = torch.nn.Sequential(
+                    torch.nn.Linear(input_dim, 32),
+                    torch.nn.ReLU(),
+                    torch.nn.Dropout(0.3),
+                    torch.nn.Linear(32, 16),
+                    torch.nn.ReLU(),
+                    torch.nn.Dropout(0.3),
+                    torch.nn.Linear(16, 1)
+                )
+            
+            def forward(self, x):
+                return self.net(x)
+        
+        model = DeepSurvNet(X_train.shape[1]).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        
+        # Train
+        model.train()
+        for epoch in range(50):
+            optimizer.zero_grad()
+            risk_pred = model(X_train_t).squeeze()
+            
+            # Simple Cox loss
+            sorted_idx = torch.argsort(torch.tensor(y_train['time']))
+            sorted_risk = risk_pred[sorted_idx]
+            sorted_event = torch.tensor(
+                y_train['event'][sorted_idx], 
+                dtype=torch.float32
+            ).to(device)
+            
+            exp_risk = torch.exp(sorted_risk)
+            risk_sum = torch.cumsum(exp_risk.flip(0), 0).flip(0)
+            loss = -torch.mean(sorted_event * (sorted_risk - torch.log(risk_sum + 1e-7)))
+            
+            loss.backward()
+            optimizer.step()
+        
+        # Evaluate
+        model.eval()
+        with torch.no_grad():
+            risk_scores = model(X_test_t).squeeze().cpu().numpy()
+        
+        c_index = concordance_index_censored(
+            y_test['event'].astype(bool), y_test['time'], risk_scores
+        )[0]
+        
+        return c_index, risk_scores
+
+
+def load_embeddings_data(data_path: str, dataset_name: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Load embeddings from parquet file"""
+    df = pd.read_parquet(data_path)
+    
+    # Extract embeddings based on file type
+    if 'eagle_embeddings' in df.columns:
+        # EAGLE embeddings
+        embeddings = np.array(df['eagle_embeddings'].tolist())
+    elif 'medgemma_embeddings' in df.columns:
+        # MedGemma embeddings
+        embeddings = np.array(df['medgemma_embeddings'].tolist())
+    else:
+        # Unimodal embeddings - need to concatenate different modalities
+        embedding_cols = [col for col in df.columns if 'embedding' in col and not 'shape' in col]
+        embeddings_list = []
+        
+        for col in embedding_cols:
+            if pd.api.types.is_object_dtype(df[col]):
+                # Process byte embeddings
+                col_embeddings = []
+                for emb in df[col]:
+                    if pd.notna(emb):
+                        if isinstance(emb, bytes):
+                            emb_array = np.frombuffer(emb, dtype=np.float32)
+                        else:
+                            emb_array = np.array(emb)
+                        col_embeddings.append(emb_array)
+                    else:
+                        # Use zeros for missing embeddings
+                        col_embeddings.append(np.zeros(1000))  # Default size
+                
+                embeddings_list.append(np.array(col_embeddings))
+        
+        # Concatenate all embeddings
+        embeddings = np.concatenate(embeddings_list, axis=1)
+    
+    # Extract survival data based on dataset
+    if dataset_name == "GBM":
+        y_time = df['survival_time_in_months'].values
+        y_event = (df['vital_status_desc'] == 'DEAD').astype(int).values
+    elif dataset_name == "IPMN":
+        y_time = df['survival_time_days'].values / 30.44  # Convert to months
+        y_event = (df['vital_status'] == 'DEAD').astype(int).values
+    else:  # NSCLC
+        y_time = df['SURVIVAL_TIME_IN_MONTHS'].values
+        y_event = df['event'].values
+    
+    return embeddings, y_time, y_event
+
+
+def run_baseline_comparison(args):
+    """Run baseline model comparison across different embeddings"""
+    logging.info("Running baseline model comparison...")
+    
+    results = []
+    datasets = ["GBM", "IPMN", "NSCLC"]
+    embedding_types = {
+        "unimodal": "Unimodal",
+        "medgemma": "MedGemma",
+        "eagle": "EAGLE"
+    }
+    models = ["RSF", "CoxPH", "DeepSurv"]
+    
+    for dataset in datasets:
+        logging.info(f"\nProcessing {dataset}...")
+        
+        for emb_file, emb_name in embedding_types.items():
+            data_path = f"data/{dataset}/{emb_file}.parquet"
+            
+            # Skip EAGLE embeddings if they don't exist yet
+            if emb_file == "eagle" and not Path(data_path).exists():
+                continue
+            
+            logging.info(f"  Loading {emb_name} embeddings...")
+            try:
+                X, y_time, y_event = load_embeddings_data(data_path, dataset)
+            except Exception as e:
+                logging.warning(f"  Failed to load {data_path}: {e}")
+                continue
+            
+            # Prepare data
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # Cross-validation
+            skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+            
+            for model_name in models:
+                cv_scores = []
+                
+                for fold, (train_idx, test_idx) in enumerate(skf.split(X_scaled, y_event)):
+                    X_train, X_test = X_scaled[train_idx], X_scaled[test_idx]
+                    y_train = {'time': y_time[train_idx], 'event': y_event[train_idx]}
+                    y_test = {'time': y_time[test_idx], 'event': y_event[test_idx]}
+                    
+                    # Run model
+                    if model_name == "RSF":
+                        c_index, _ = BaselineModels.run_rsf(X_train, y_train, X_test, y_test)
+                    elif model_name == "CoxPH":
+                        c_index, _ = BaselineModels.run_coxph(X_train, y_train, X_test, y_test)
+                    else:  # DeepSurv
+                        c_index, _ = BaselineModels.run_deepsurv(X_train, y_train, X_test, y_test)
+                    
+                    if not np.isnan(c_index):
+                        cv_scores.append(c_index)
+                
+                if cv_scores:
+                    result = {
+                        'Dataset': dataset,
+                        'Embedding': emb_name,
+                        'Model': model_name,
+                        'Mean_C_Index': np.mean(cv_scores),
+                        'Std_C_Index': np.std(cv_scores),
+                        'N_Features': X.shape[1]
+                    }
+                    results.append(result)
+                    logging.info(f"    {model_name}: {result['Mean_C_Index']:.4f} ± {result['Std_C_Index']:.4f}")
+    
+    # Save results
+    results_df = pd.DataFrame(results)
+    results_df.to_csv('results/baseline_comparison.csv', index=False)
+    
+    # Print summary
+    print("\n" + "="*80)
+    print("BASELINE MODEL COMPARISON")
+    print("="*80)
+    
+    pivot_table = results_df.pivot_table(
+        index=['Dataset', 'Model'],
+        columns='Embedding',
+        values='Mean_C_Index'
+    ).round(4)
+    
+    print(pivot_table)
+    
+    return results_df
+
+
+def train_eagle_models(args):
+    """Train EAGLE models on all datasets"""
+    logging.info("Training EAGLE models...")
+    
+    datasets = ["GBM", "IPMN", "NSCLC"]
+    configs = {
+        "GBM": GBM_CONFIG,
+        "IPMN": IPMN_CONFIG,
+        "NSCLC": NSCLC_CONFIG
     }
     
-    # Create all directories
-    for dir_path in dirs.values():
-        dir_path.mkdir(parents=True, exist_ok=True)
+    results = []
     
-    # Create a run info file
-    run_info_path = output_dir / "run_info.txt"
-    with open(run_info_path, "w") as f:
-        f.write(f"Dataset: {dataset_name}\n")
-        f.write(f"Timestamp: {timestamp}\n")
-        f.write(f"Output directory: {output_dir}\n")
+    for dataset in datasets:
+        logging.info(f"\nTraining EAGLE on {dataset}...")
+        
+        # Create output directory
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_dir = Path(f"results/{dataset}/{timestamp}")
+        output_dirs = {
+            "base": output_dir,
+            "models": output_dir / "models",
+            "results": output_dir / "results",
+            "figures": output_dir / "figures",
+            "attribution": output_dir / "attribution",
+            "logs": output_dir / "logs"
+        }
+        
+        for dir_path in output_dirs.values():
+            dir_path.mkdir(parents=True, exist_ok=True)
+        
+        # Get configuration
+        config = configs[dataset]
+        model_config = ModelConfig(
+            num_epochs=args.epochs,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate
+        )
+        
+        # Train model
+        pipeline = UnifiedPipeline(config, model_config, output_dirs=output_dirs)
+        eagle_results, risk_df, stats = pipeline.run(
+            n_folds=5,
+            n_risk_groups=3,
+            enable_attribution=args.analyze_attribution
+        )
+        
+        # Store results
+        results.append({
+            'Dataset': dataset,
+            'Embedding': 'EAGLE Model',
+            'Model': 'EAGLE',
+            'Mean_C_Index': eagle_results['mean_cindex'],
+            'Std_C_Index': eagle_results['std_cindex'],
+            'N_Features': 'Multi-modal'
+        })
+        
+        logging.info(f"  EAGLE C-index: {eagle_results['mean_cindex']:.4f} ± {eagle_results['std_cindex']:.4f}")
+        
+        # Generate EAGLE embeddings
+        if args.generate_embeddings:
+            logging.info(f"  Generating EAGLE embeddings for {dataset}...")
+            generate_eagle_embeddings(dataset, output_dir / "models")
     
-    return dirs
+    return results
+
+
+def generate_eagle_embeddings(dataset: str, model_dir: Path):
+    """Generate EAGLE embeddings from trained model"""
+    # Get configuration
+    configs = {
+        "GBM": GBM_CONFIG,
+        "IPMN": IPMN_CONFIG,
+        "NSCLC": NSCLC_CONFIG
+    }
+    config = configs[dataset]
+    
+    # Load data
+    df = pd.read_parquet(config.data_path)
+    pipeline = UnifiedPipeline(config)
+    df_filtered = pipeline._filter_data(df)
+    
+    # Initialize processors
+    clinical_processor = UnifiedClinicalProcessor(config)
+    clinical_processor.fit(df_filtered)
+    text_extractor = get_text_extractor(config.name)
+    
+    # Create dataset
+    dataset_obj = UnifiedSurvivalDataset(
+        df_filtered, config, clinical_processor, text_extractor
+    )
+    
+    # Load model
+    model_path = model_dir / "best_model_fold1.pth"
+    if not model_path.exists():
+        model_path = model_dir / "fold1.pth"
+    
+    num_clinical = dataset_obj.clinical_features.shape[1]
+    num_text_features = len(text_extractor.get_feature_names()) if text_extractor else 0
+    
+    model = UnifiedSurvivalModel(
+        dataset_config=config,
+        model_config=ModelConfig(),
+        num_clinical_features=num_clinical,
+        num_text_features=num_text_features,
+    )
+    model.load_state_dict(torch.load(model_path, map_location='cpu'))
+    model.eval()
+    
+    # Extract embeddings
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    eagle_embeddings = []
+    with torch.no_grad():
+        for idx in range(len(dataset_obj)):
+            data = dataset_obj[idx]
+            
+            # Prepare inputs
+            imaging = data["imaging_features"].unsqueeze(0).to(device)
+            clinical = data["clinical_features"].unsqueeze(0).to(device)
+            text_embeddings = {k: v.unsqueeze(0).to(device) for k, v in data["text_embeddings"].items()}
+            
+            # Get fused features
+            fused_features = model.get_fused_features(imaging, clinical, text_embeddings)
+            eagle_embeddings.append(fused_features.cpu().numpy().squeeze())
+    
+    # Save embeddings
+    output_df = df_filtered.copy()
+    output_df["eagle_embeddings"] = eagle_embeddings
+    output_df["eagle_embedding_shape"] = [emb.shape for emb in eagle_embeddings]
+    
+    output_path = f"data/{dataset}/eagle.parquet"
+    output_df.to_parquet(output_path, index=False)
+    logging.info(f"    Saved EAGLE embeddings to {output_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="EAGLE Survival Analysis with Attribution")
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        required=True,
-        choices=["GBM", "IPMN", "NSCLC"],
-        help="Dataset to analyze",
-    )
-    parser.add_argument(
-        "--data-path", type=str, default=None, help="Custom path to dataset"
-    )
-    parser.add_argument(
-        "--folds", type=int, default=5, help="Number of cross-validation folds"
-    )
-    parser.add_argument(
-        "--risk-groups",
-        type=int,
-        default=3,
-        help="Number of risk stratification groups",
-    )
-    parser.add_argument(
-        "--epochs", type=int, default=100, help="Number of training epochs"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=32, help="Batch size for training"
-    )
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument(
-        "--output-base-dir", 
-        type=str, 
-        default="results", 
-        help="Base directory for outputs"
-    )
-    parser.add_argument(
-        "--analyze-attribution",
-        action="store_true",
-        help="Perform modality attribution analysis"
-    )
-    parser.add_argument(
-        "--attribution-samples",
-        type=int,
-        default=None,
-        help="Number of samples for detailed attribution analysis (default: all)"
-    )
-    parser.add_argument(
-        "--top-patients",
-        type=int,
-        default=20,
-        help="Number of top/bottom risk patients to analyze in detail"
-    )
-
+    parser = argparse.ArgumentParser(description="EAGLE: Multimodal Survival Analysis")
+    
+    # Main modes
+    parser.add_argument("--mode", type=str, default="all",
+                       choices=["train", "baseline", "all"],
+                       help="Mode: train EAGLE only, run baselines only, or all")
+    
+    # Training parameters
+    parser.add_argument("--epochs", type=int, default=100,
+                       help="Number of training epochs")
+    parser.add_argument("--batch-size", type=int, default=32,
+                       help="Batch size")
+    parser.add_argument("--learning-rate", type=float, default=1e-4,
+                       help="Learning rate")
+    parser.add_argument("--analyze-attribution", action="store_true",
+                       help="Run attribution analysis")
+    parser.add_argument("--generate-embeddings", action="store_true", default=True,
+                       help="Generate EAGLE embeddings after training")
+    
     args = parser.parse_args()
-
-    # Create output directory structure
-    output_dirs = create_output_directory(args.dataset, args.output_base_dir)
     
-    print(f"\nOutput directory created: {output_dirs['base']}")
-
-    # Select dataset configuration
-    if args.dataset == "GBM":
-        config = GBM_CONFIG
-    elif args.dataset == "IPMN":
-        config = IPMN_CONFIG
-    else:  # NSCLC
-        config = NSCLC_CONFIG
-
-    # Override data path if provided
-    if args.data_path:
-        config.data_path = args.data_path
-
-    # Create model configuration
-    model_config = ModelConfig(
-        num_epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr
-    )
-
-    # Create and run pipeline with output directory
-    print(f"\nRunning {args.dataset} analysis...")
-    print(f"Data path: {config.data_path}")
-    print(f"Folds: {args.folds}, Risk groups: {args.risk_groups}")
-    print(f"Attribution analysis: {'Enabled' if args.analyze_attribution else 'Disabled'}")
-    print("-" * 60)
-
-    pipeline = UnifiedPipeline(config, model_config, output_dirs=output_dirs)
-    results, risk_df, stats = pipeline.run(
-        n_folds=args.folds, 
-        n_risk_groups=args.risk_groups,
-        enable_attribution=args.analyze_attribution
-    )
-
-    # Print results
-    print("\nResults:")
-    print(f"Mean C-index: {results['mean_cindex']:.4f} ± {results['std_cindex']:.4f}")
-    print(f"Per-fold C-indices: {[f'{s:.4f}' for s in results['all_scores']]}")
-
-    # Save results to organized structure
-    risk_scores_path = output_dirs["results"] / "risk_scores.csv"
-    risk_df.to_csv(risk_scores_path, index=False)
-    print(f"\nRisk scores saved to: {risk_scores_path}")
-
-    # Save summary results
-    summary_path = output_dirs["results"] / "summary_results.txt"
-    with open(summary_path, "w") as f:
-        f.write(f"Dataset: {args.dataset}\n")
-        f.write(f"Mean C-index: {results['mean_cindex']:.4f} ± {results['std_cindex']:.4f}\n")
-        f.write(f"Per-fold C-indices: {results['all_scores']}\n")
-        f.write(f"Number of patients: {len(risk_df)}\n")
-        f.write(f"Number of events: {risk_df['event'].sum()}\n")
-        f.write(f"Event rate: {risk_df['event'].mean():.2%}\n")
-
-    # Create standard visualizations
-    print("\nCreating visualizations...")
-    km_curves_path = output_dirs["figures"] / "km_curves.png"
-    plot_km_curves(
-        risk_df,
-        title=f"{args.dataset} Risk-Stratified Survival",
-        save_path=str(km_curves_path),
-    )
+    # Ensure results directory exists
+    Path("results").mkdir(exist_ok=True)
     
-    create_comprehensive_plots(risk_df, output_dir=str(output_dirs["figures"]))
-
-    # Perform detailed attribution analysis if requested
-    if args.analyze_attribution:
-        print("\nPerforming detailed attribution analysis...")
+    if args.mode in ["train", "all"]:
+        # Train EAGLE models
+        eagle_results = train_eagle_models(args)
         
-        # Check if attribution scores are in risk_df (from simple analysis)
-        if "imaging_contribution" in risk_df.columns:
-            # Create attribution visualizations
-            print("Creating attribution visualizations...")
+        if args.mode == "all":
+            # Run baselines after training
+            baseline_results = run_baseline_comparison(args)
             
-            # Overall modality contributions
-            contrib_path = output_dirs["attribution"] / "modality_contributions.png"
-            plot_modality_contributions(
-                risk_df, 
-                save_path=str(contrib_path),
-                dataset_name=args.dataset
-            )
+            # Combine results
+            all_results = pd.DataFrame(eagle_results)
+            if not baseline_results.empty:
+                all_results = pd.concat([baseline_results, pd.DataFrame(eagle_results)], ignore_index=True)
             
-            # Create comprehensive attribution report
-            attribution_summary = create_attribution_report(
-                risk_df,
-                output_dir=str(output_dirs["attribution"]),
-                dataset_name=args.dataset
-            )
+            # Save combined results
+            all_results.to_csv('results/all_results.csv', index=False)
             
-            print(f"\nAttribution analysis saved to: {output_dirs['attribution']}")
+            # Print final summary
+            print("\n" + "="*80)
+            print("COMPLETE ANALYSIS SUMMARY")
+            print("="*80)
             
-            # Analyze top and bottom risk patients
-            if args.top_patients > 0:
-                print(f"\nAnalyzing top {args.top_patients} highest and lowest risk patients...")
-                from eagle import UnifiedRiskStratification
-                
-                # Create analyzer with the best model
-                best_fold = results.get('best_fold', 0)
-                model_path = output_dirs["models"] / f"fold{best_fold + 1}.pth"
-                
-                if model_path.exists():
-                    # Load model and dataset for detailed analysis
-                    from eagle import UnifiedSurvivalModel, UnifiedSurvivalDataset, UnifiedClinicalProcessor, get_text_extractor
-                    import pandas as pd
-                    import torch
-                    
-                    # Load data
-                    df = pd.read_parquet(config.data_path)
-                    df = pipeline._filter_data(df)
-                    
-                    # Initialize processors
-                    clinical_processor = UnifiedClinicalProcessor(config)
-                    clinical_processor.fit(df)
-                    text_extractor = get_text_extractor(config.name)
-                    
-                    # Create dataset
-                    dataset = UnifiedSurvivalDataset(
-                        df, config, clinical_processor, text_extractor
-                    )
-                    
-                    # Load model
-                    num_clinical = dataset.clinical_features.shape[1]
-                    num_text_features = len(text_extractor.get_feature_names()) if text_extractor else 0
-                    
-                    model = UnifiedSurvivalModel(
-                        dataset_config=config,
-                        model_config=model_config,
-                        num_clinical_features=num_clinical,
-                        num_text_features=num_text_features,
-                    )
-                    model.load_state_dict(torch.load(model_path))
-                    
-                    # Create attribution analyzer
-                    analyzer = ModalityAttributionAnalyzer(model, dataset)
-                    
-                    # Analyze specific patients
-                    top_patients_df = risk_df.nlargest(args.top_patients, 'risk_score')
-                    bottom_patients_df = risk_df.nsmallest(args.top_patients, 'risk_score')
-                    
-                    # Create detailed patient-level plots for a few examples
-                    n_examples = min(3, args.top_patients)
-                    
-                    print(f"Creating detailed attribution plots for {n_examples} high-risk patients...")
-                    for i, (idx, patient) in enumerate(top_patients_df.head(n_examples).iterrows()):
-                        # Find dataset index
-                        dataset_idx = df[df.index == idx].index[0] if idx in df.index else i
-                        
-                        try:
-                            result = analyzer.analyze_patient(dataset_idx)
-                            patient_path = output_dirs["attribution"] / f"high_risk_patient_{i+1}.png"
-                            
-                            # Get feature names for the dataset
-                            feature_names = {}
-                            if config.name == "GBM":
-                                feature_names['text_features'] = text_extractor.get_feature_names() if text_extractor else []
-                                feature_names['clinical'] = config.clinical_features
-                            elif config.name == "IPMN":
-                                feature_names['text_features'] = text_extractor.get_feature_names() if text_extractor else []
-                                feature_names['clinical'] = config.clinical_features
-                            else:  # NSCLC
-                                feature_names['text_features'] = text_extractor.get_feature_names() if text_extractor else []
-                                feature_names['clinical'] = config.clinical_features
-                            
-                            plot_patient_level_attribution(
-                                result,
-                                feature_names=feature_names,
-                                save_path=str(patient_path)
-                            )
-                        except Exception as e:
-                            print(f"Could not analyze patient {i+1}: {str(e)}")
-                
-        else:
-            print("Basic attribution scores not found in results. Run with UnifiedRiskStratification.generate_risk_scores(compute_attributions=True)")
-
-    print(f"\nAll outputs saved to: {output_dirs['base']}")
-    print("\nAnalysis complete!")
+            for dataset in ["GBM", "IPMN", "NSCLC"]:
+                dataset_results = all_results[all_results['Dataset'] == dataset]
+                if not dataset_results.empty:
+                    best_idx = dataset_results['Mean_C_Index'].idxmax()
+                    best = dataset_results.loc[best_idx]
+                    print(f"\n{dataset}:")
+                    print(f"  Best: {best['Model']} + {best['Embedding']} (C-Index: {best['Mean_C_Index']:.4f})")
     
-    return results, risk_df, output_dirs
+    elif args.mode == "baseline":
+        # Run baselines only
+        run_baseline_comparison(args)
+    
+    print("\nAnalysis complete!")
 
 
 if __name__ == "__main__":
-    results, risk_df, output_dirs = main()
+    main()

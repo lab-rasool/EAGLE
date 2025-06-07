@@ -10,6 +10,9 @@ from .data import (
     GBM_CONFIG,
     IPMN_CONFIG,
     NSCLC_CONFIG,
+    GBM_MEDGEMMA_CONFIG,
+    IPMN_MEDGEMMA_CONFIG,
+    NSCLC_MEDGEMMA_CONFIG,
 )
 from .models import ModelConfig, UnifiedSurvivalModel
 from .train import UnifiedTrainer
@@ -345,6 +348,9 @@ __all__ = [
     "GBM_CONFIG",
     "IPMN_CONFIG",
     "NSCLC_CONFIG",
+    "GBM_MEDGEMMA_CONFIG",
+    "IPMN_MEDGEMMA_CONFIG",
+    "NSCLC_MEDGEMMA_CONFIG",
     "plot_km_curves",
     "create_comprehensive_plots",
     "ModalityAttributionAnalyzer",
