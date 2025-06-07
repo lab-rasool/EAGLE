@@ -1,0 +1,43 @@
+BASELINE SURVIVAL MODEL COMPARISON REPORT
+==================================================
+
+Generated on: 2025-06-06 23:52:31
+
+SUMMARY OF RESULTS:
+--------------------
+Embedding          EAGLE  MedGemma  Unimodal
+Dataset Model                               
+GBM     COXPH     0.7608    0.5613    0.4871
+        DEEPSURV  0.7778    0.6192    0.6119
+        RSF       0.2477    0.4555    0.4132
+IPMN    COXPH     0.8090    0.5152    0.5717
+        DEEPSURV  0.8261    0.6501    0.6221
+        RSF       0.1791    0.3363    0.4224
+NSCLC   COXPH     0.8827    0.7053    0.5037
+        DEEPSURV  0.8960    0.7426    0.6091
+        RSF       0.1091    0.3267    0.4826
+
+BEST PERFORMING METHODS BY DATASET:
+-----------------------------------
+GBM: DEEPSURV with EAGLE (C-index: 0.7778 ± 0.0446)
+IPMN: DEEPSURV with EAGLE (C-index: 0.8261 ± 0.0445)
+NSCLC: DEEPSURV with EAGLE (C-index: 0.8960 ± 0.0126)
+
+
+DETAILED ANALYSIS:
+------------------
+
+Unimodal Embeddings:
+  Average C-index: 0.5249
+  Best performance: 0.6221
+  Worst performance: 0.4132
+
+MedGemma Embeddings:
+  Average C-index: 0.5458
+  Best performance: 0.7426
+  Worst performance: 0.3267
+
+EAGLE Embeddings:
+  Average C-index: 0.6098
+  Best performance: 0.8960
+  Worst performance: 0.1091
