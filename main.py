@@ -123,6 +123,13 @@ class BaselineModels:
         """Simple DeepSurv implementation"""
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
+        # Apply PCA if too many features (similar to CoxPH)
+        if X_train.shape[1] > 100:
+            from sklearn.decomposition import PCA
+            pca = PCA(n_components=min(100, X_train.shape[0] // 2), random_state=42)
+            X_train = pca.fit_transform(X_train)
+            X_test = pca.transform(X_test)
+        
         # Convert to tensors
         X_train_t = torch.FloatTensor(X_train).to(device)
         X_test_t = torch.FloatTensor(X_test).to(device)
@@ -149,7 +156,10 @@ class BaselineModels:
         
         # Train
         model.train()
-        for epoch in range(50):
+        best_loss = float('inf')
+        patience_counter = 0
+        
+        for epoch in range(100):  # Increased epochs
             optimizer.zero_grad()
             risk_pred = model(X_train_t).squeeze()
             
@@ -161,21 +171,48 @@ class BaselineModels:
                 dtype=torch.float32
             ).to(device)
             
+            # Clip predictions to prevent overflow
+            sorted_risk = torch.clamp(sorted_risk, min=-10, max=10)
+            
             exp_risk = torch.exp(sorted_risk)
             risk_sum = torch.cumsum(exp_risk.flip(0), 0).flip(0)
             loss = -torch.mean(sorted_event * (sorted_risk - torch.log(risk_sum + 1e-7)))
             
+            # Check for NaN
+            if torch.isnan(loss):
+                logging.warning("NaN loss encountered in DeepSurv")
+                return np.nan, np.zeros(len(X_test))
+            
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
             optimizer.step()
+            
+            # Early stopping
+            if loss.item() < best_loss:
+                best_loss = loss.item()
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter > 10:
+                    break
         
         # Evaluate
         model.eval()
         with torch.no_grad():
             risk_scores = model(X_test_t).squeeze().cpu().numpy()
+            
+            # Check for NaN in predictions
+            if np.any(np.isnan(risk_scores)):
+                logging.warning("NaN predictions in DeepSurv")
+                return np.nan, np.zeros(len(X_test))
         
-        c_index = concordance_index_censored(
-            y_test['event'].astype(bool), y_test['time'], risk_scores
-        )[0]
+        try:
+            c_index = concordance_index_censored(
+                y_test['event'].astype(bool), y_test['time'], risk_scores
+            )[0]
+        except Exception as e:
+            logging.warning(f"DeepSurv C-index calculation failed: {e}")
+            return np.nan, risk_scores
         
         return c_index, risk_scores
 
@@ -188,35 +225,128 @@ def load_embeddings_data(data_path: str, dataset_name: str) -> Tuple[np.ndarray,
     if 'eagle_embeddings' in df.columns:
         # EAGLE embeddings
         embeddings = np.array(df['eagle_embeddings'].tolist())
-    elif 'medgemma_embeddings' in df.columns:
-        # MedGemma embeddings
-        embeddings = np.array(df['medgemma_embeddings'].tolist())
-    else:
-        # Unimodal embeddings - need to concatenate different modalities
-        embedding_cols = [col for col in df.columns if 'embedding' in col and not 'shape' in col]
-        embeddings_list = []
-        
-        for col in embedding_cols:
-            if pd.api.types.is_object_dtype(df[col]):
-                # Process byte embeddings
-                col_embeddings = []
-                for emb in df[col]:
+    elif "medgemma" in data_path:
+        # MedGemma files have dataset-specific structures
+        if dataset_name == "GBM":
+            # Use combined embeddings for GBM MedGemma
+            if 'combined_embeddings' in df.columns:
+                embeddings = []
+                for emb in df['combined_embeddings']:
+                    if isinstance(emb, bytes):
+                        embeddings.append(np.frombuffer(emb, dtype=np.float32))
+                    else:
+                        embeddings.append(np.array(emb))
+                
+                # Pad to max size to handle variable shapes
+                max_size = max(emb.shape[0] for emb in embeddings)
+                padded_embeddings = []
+                for emb in embeddings:
+                    if emb.shape[0] < max_size:
+                        padded = np.pad(emb, (0, max_size - emb.shape[0]), mode='constant')
+                        padded_embeddings.append(padded)
+                    else:
+                        padded_embeddings.append(emb)
+                embeddings = np.array(padded_embeddings)
+                    
+        elif dataset_name == "IPMN":
+            # Use fused embeddings for IPMN MedGemma
+            if 'multimodal_ct_fused_embeddings' in df.columns:
+                embeddings = []
+                for emb in df['multimodal_ct_fused_embeddings']:
+                    if isinstance(emb, bytes):
+                        embeddings.append(np.frombuffer(emb, dtype=np.float32))
+                    else:
+                        embeddings.append(np.array(emb))
+                
+                # Pad to max size
+                max_size = max(emb.shape[0] for emb in embeddings)
+                padded_embeddings = []
+                for emb in embeddings:
+                    if emb.shape[0] < max_size:
+                        padded = np.pad(emb, (0, max_size - emb.shape[0]), mode='constant')
+                        padded_embeddings.append(padded)
+                    else:
+                        padded_embeddings.append(emb)
+                embeddings = np.array(padded_embeddings)
+                    
+        else:  # NSCLC
+            # For NSCLC, use contrast embeddings as primary
+            if 'multimodal_contrast_embeddings' in df.columns:
+                embeddings = []
+                for emb in df['multimodal_contrast_embeddings']:
                     if pd.notna(emb):
                         if isinstance(emb, bytes):
-                            emb_array = np.frombuffer(emb, dtype=np.float32)
+                            embeddings.append(np.frombuffer(emb, dtype=np.float32))
                         else:
-                            emb_array = np.array(emb)
-                        col_embeddings.append(emb_array)
+                            embeddings.append(np.array(emb))
                     else:
-                        # Use zeros for missing embeddings
-                        col_embeddings.append(np.zeros(1000))  # Default size
+                        embeddings.append(None)
                 
-                embeddings_list.append(np.array(col_embeddings))
-        
-        # Concatenate all embeddings
-        embeddings = np.concatenate(embeddings_list, axis=1)
+                # Filter out None values and get valid embeddings
+                valid_embeddings = [e for e in embeddings if e is not None]
+                valid_indices = [i for i, e in enumerate(embeddings) if e is not None]
+                
+                if valid_embeddings:
+                    # Pad to max size
+                    max_size = max(emb.shape[0] for emb in valid_embeddings)
+                    padded_embeddings = []
+                    for emb in valid_embeddings:
+                        if emb.shape[0] < max_size:
+                            padded = np.pad(emb, (0, max_size - emb.shape[0]), mode='constant')
+                            padded_embeddings.append(padded)
+                        else:
+                            padded_embeddings.append(emb)
+                    embeddings = np.array(padded_embeddings)
+                    
+                    # Return filtered dataframe indices for survival data
+                    df = df.iloc[valid_indices]
+                else:
+                    raise ValueError("No valid embeddings found")
     
-    # Extract survival data based on dataset
+    else:
+        # Unimodal files - use primary modality only for baseline comparison
+        primary_col = None
+        
+        if dataset_name == "GBM":
+            primary_col = 'mri_embeddings'
+        elif dataset_name == "IPMN":
+            primary_col = 'ct_embeddings'
+        else:  # NSCLC
+            primary_col = 'ct_contrast_embeddings'
+        
+        # Process primary embeddings
+        if primary_col and primary_col in df.columns:
+            embeddings = []
+            valid_indices = []
+            
+            for idx, emb in enumerate(df[primary_col]):
+                if pd.notna(emb):
+                    if isinstance(emb, bytes):
+                        embeddings.append(np.frombuffer(emb, dtype=np.float32))
+                    else:
+                        embeddings.append(np.array(emb))
+                    valid_indices.append(idx)
+            
+            if embeddings:
+                # Pad to max size to handle variable shapes
+                max_size = max(emb.shape[0] for emb in embeddings)
+                padded_embeddings = []
+                for emb in embeddings:
+                    if emb.shape[0] < max_size:
+                        padded = np.pad(emb, (0, max_size - emb.shape[0]), mode='constant')
+                        padded_embeddings.append(padded)
+                    else:
+                        padded_embeddings.append(emb)
+                embeddings = np.array(padded_embeddings)
+                
+                # Filter dataframe to match valid embeddings
+                df = df.iloc[valid_indices]
+            else:
+                raise ValueError(f"No valid embeddings found in {primary_col}")
+        else:
+            raise ValueError(f"Primary embedding column {primary_col} not found")
+    
+    # Extract survival data based on dataset (using potentially filtered df)
     if dataset_name == "GBM":
         y_time = df['survival_time_in_months'].values
         y_event = (df['vital_status_desc'] == 'DEAD').astype(int).values
@@ -226,6 +356,19 @@ def load_embeddings_data(data_path: str, dataset_name: str) -> Tuple[np.ndarray,
     else:  # NSCLC
         y_time = df['SURVIVAL_TIME_IN_MONTHS'].values
         y_event = df['event'].values
+    
+    # Filter out any NaN values in survival data
+    valid_mask = ~(np.isnan(y_time) | np.isnan(y_event))
+    if not np.all(valid_mask):
+        logging.warning(f"Filtering out {np.sum(~valid_mask)} samples with NaN survival data")
+        embeddings = embeddings[valid_mask]
+        y_time = y_time[valid_mask]
+        y_event = y_event[valid_mask]
+    
+    # Ensure positive survival times
+    if np.any(y_time <= 0):
+        logging.warning(f"Found {np.sum(y_time <= 0)} non-positive survival times, setting to 0.1")
+        y_time[y_time <= 0] = 0.1
     
     return embeddings, y_time, y_event
 
