@@ -520,6 +520,36 @@ def train_eagle_models(args):
         
         logging.info(f"  EAGLE C-index: {eagle_results['mean_cindex']:.4f} ± {eagle_results['std_cindex']:.4f}")
         
+        # Generate visualizations
+        logging.info(f"  Generating visualizations for {dataset}...")
+        from eagle.viz import plot_km_curves, create_comprehensive_plots, plot_dataset_specific
+        
+        # Save risk dataframe
+        risk_df.to_csv(output_dirs["results"] / "risk_scores.csv", index=False)
+        
+        # Generate Kaplan-Meier curves
+        km_path = output_dirs["figures"] / "kaplan_meier_curves.png"
+        plot_km_curves(risk_df, title=f"{dataset} Risk-Stratified Survival Curves", save_path=str(km_path))
+        
+        # Generate comprehensive plots
+        create_comprehensive_plots(risk_df, output_dir=str(output_dirs["figures"]))
+        
+        # Generate dataset-specific plots
+        plot_dataset_specific(risk_df, dataset, output_dir=str(output_dirs["figures"]))
+        
+        # Generate attribution plots if enabled
+        if args.analyze_attribution and "imaging_contribution" in risk_df.columns:
+            logging.info(f"  Generating attribution visualizations for {dataset}...")
+            from eagle.attribution import plot_modality_contributions, plot_patient_level_attribution
+            
+            # Plot modality contributions
+            attr_path = output_dirs["attribution"] / "modality_contributions.png"
+            plot_modality_contributions(risk_df, save_path=str(attr_path), dataset_name=dataset)
+            
+            # Plot patient-level attribution
+            patient_attr_path = output_dirs["attribution"] / "patient_level_attribution.png"
+            plot_patient_level_attribution(risk_df, save_path=str(patient_attr_path))
+        
         # Generate EAGLE embeddings
         if args.generate_embeddings:
             logging.info(f"  Generating EAGLE embeddings for {dataset}...")

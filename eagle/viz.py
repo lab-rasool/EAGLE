@@ -46,7 +46,7 @@ def plot_km_curves(
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.show()
+    plt.close()
 
     return kmf_dict
 

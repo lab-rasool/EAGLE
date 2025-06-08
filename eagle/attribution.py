@@ -502,6 +502,108 @@ def plot_patient_level_attribution(result: AttributionResult,
     plt.close()
 
 
+def plot_patient_level_attribution(attribution_df: pd.DataFrame,
+                                 save_path: str = 'patient_attribution.png',
+                                 n_patients: int = 10):
+    """Plot patient-level attribution analysis for top and bottom risk patients"""
+    
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Sort by risk score
+    df_sorted = attribution_df.sort_values('risk_score', ascending=False)
+    
+    # Get top and bottom patients
+    top_patients = df_sorted.head(n_patients)
+    bottom_patients = df_sorted.tail(n_patients)
+    
+    # 1. Top risk patients modality contributions
+    ax = axes[0, 0]
+    patient_ids = [f"P{i+1}" for i in range(len(top_patients))]
+    
+    x = np.arange(len(patient_ids))
+    width = 0.25
+    
+    ax.bar(x - width, top_patients['imaging_contribution'], width, label='Imaging', color='#3498db')
+    ax.bar(x, top_patients['text_contribution'], width, label='Text', color='#e74c3c')
+    ax.bar(x + width, top_patients['clinical_contribution'], width, label='Clinical', color='#2ecc71')
+    
+    ax.set_xlabel('Patient', fontsize=12)
+    ax.set_ylabel('Contribution (%)', fontsize=12)
+    ax.set_title(f'Top {n_patients} High-Risk Patients - Modality Contributions', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(patient_ids, rotation=45)
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    # 2. Bottom risk patients modality contributions
+    ax = axes[0, 1]
+    patient_ids = [f"P{i+1}" for i in range(len(bottom_patients))]
+    
+    x = np.arange(len(patient_ids))
+    
+    ax.bar(x - width, bottom_patients['imaging_contribution'], width, label='Imaging', color='#3498db')
+    ax.bar(x, bottom_patients['text_contribution'], width, label='Text', color='#e74c3c')
+    ax.bar(x + width, bottom_patients['clinical_contribution'], width, label='Clinical', color='#2ecc71')
+    
+    ax.set_xlabel('Patient', fontsize=12)
+    ax.set_ylabel('Contribution (%)', fontsize=12)
+    ax.set_title(f'Bottom {n_patients} Low-Risk Patients - Modality Contributions', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(patient_ids, rotation=45)
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    # 3. Contribution vs Risk Score with trend lines
+    ax = axes[1, 0]
+    
+    # Plot scatter for each modality
+    ax.scatter(attribution_df['risk_score'], attribution_df['imaging_contribution'],
+              alpha=0.5, label='Imaging', color='#3498db', s=20)
+    ax.scatter(attribution_df['risk_score'], attribution_df['text_contribution'],
+              alpha=0.5, label='Text', color='#e74c3c', s=20)
+    ax.scatter(attribution_df['risk_score'], attribution_df['clinical_contribution'],
+              alpha=0.5, label='Clinical', color='#2ecc71', s=20)
+    
+    # Add trend lines
+    from scipy import stats
+    for col, color in [('imaging_contribution', '#3498db'),
+                      ('text_contribution', '#e74c3c'),
+                      ('clinical_contribution', '#2ecc71')]:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            attribution_df['risk_score'], attribution_df[col])
+        line = slope * attribution_df['risk_score'] + intercept
+        ax.plot(attribution_df['risk_score'], line, color=color, linestyle='--', linewidth=2)
+    
+    ax.set_xlabel('Risk Score', fontsize=12)
+    ax.set_ylabel('Contribution (%)', fontsize=12)
+    ax.set_title('Modality Contribution vs Risk Score with Trends', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # 4. Heatmap of contributions for selected patients
+    ax = axes[1, 1]
+    
+    # Select diverse patients
+    n_display = 20
+    idx_to_show = np.linspace(0, len(df_sorted)-1, n_display, dtype=int)
+    selected_patients = df_sorted.iloc[idx_to_show]
+    
+    # Create heatmap data
+    heatmap_data = selected_patients[['imaging_contribution', 'text_contribution', 'clinical_contribution']].T
+    heatmap_data.columns = [f"P{i+1}" for i in range(len(selected_patients))]
+    
+    sns.heatmap(heatmap_data, annot=True, fmt='.0f', cmap='RdYlBu_r', 
+                cbar_kws={'label': 'Contribution (%)'}, ax=ax)
+    ax.set_xlabel('Patient (sorted by risk)', fontsize=12)
+    ax.set_ylabel('Modality', fontsize=12)
+    ax.set_yticklabels(['Imaging', 'Text', 'Clinical'], rotation=0)
+    ax.set_title('Modality Contribution Heatmap', fontsize=14, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 def create_attribution_report(attribution_df: pd.DataFrame, 
                             output_dir: str,
                             dataset_name: str = None):
