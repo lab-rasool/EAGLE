@@ -35,10 +35,20 @@ import pandas as pd
 class UnifiedPipeline:
     """Main pipeline for running the unified framework with attribution support"""
 
-    def __init__(self, dataset_config: DatasetConfig, model_config: ModelConfig = None, output_dirs: dict = None):
+    def __init__(
+        self,
+        dataset_config: DatasetConfig,
+        model_config: ModelConfig = None,
+        output_dirs: dict = None,
+    ):
         self.dataset_config = dataset_config
-        self.output_dirs = output_dirs or {"models": ".", "results": ".", "figures": ".", "logs": ".", "attribution": "."}
-
+        self.output_dirs = output_dirs or {
+            "models": ".",
+            "results": ".",
+            "figures": ".",
+            "logs": ".",
+            "attribution": ".",
+        }
 
         # Create dataset-specific default model config if not provided
         if model_config is None:
@@ -65,7 +75,9 @@ class UnifiedPipeline:
 
         self.model_config = model_config
 
-    def run(self, n_folds: int = 5, n_risk_groups: int = 3, enable_attribution: bool = False):
+    def run(
+        self, n_folds: int = 5, n_risk_groups: int = 3, enable_attribution: bool = False
+    ):
         """Run the complete pipeline with optional attribution analysis"""
         import logging
         import numpy as np
@@ -82,8 +94,8 @@ class UnifiedPipeline:
             format="%(asctime)s - %(levelname)s - %(message)s",
             handlers=[
                 logging.FileHandler(log_file),
-                logging.StreamHandler()  # Also print to console
-            ]
+                logging.StreamHandler(),  # Also print to console
+            ],
         )
         logging.info(f"Running {self.dataset_config.name} analysis")
         if enable_attribution:
@@ -175,8 +187,13 @@ class UnifiedPipeline:
                 # Train
                 trainer = UnifiedTrainer()
                 model, val_cindex = trainer.train_model(
-                    model, train_loader, val_loader, self.model_config,
-                    save_path=os.path.join(self.output_dirs["models"], f"best_model_fold{fold + 1}.pth")
+                    model,
+                    train_loader,
+                    val_loader,
+                    self.model_config,
+                    save_path=os.path.join(
+                        self.output_dirs["models"], f"best_model_fold{fold + 1}.pth"
+                    ),
                 )
 
                 # Evaluate
@@ -187,8 +204,7 @@ class UnifiedPipeline:
 
                 # Save fold model
                 model_path = os.path.join(
-                    self.output_dirs["models"], 
-                    f"fold{fold + 1}.pth"
+                    self.output_dirs["models"], f"fold{fold + 1}.pth"
                 )
                 torch.save(model.state_dict(), model_path)
             except Exception as e:
@@ -212,7 +228,7 @@ class UnifiedPipeline:
             "mean_cindex": np.mean(all_scores),
             "std_cindex": np.std(all_scores),
             "all_scores": all_scores,
-            "best_fold": best_fold
+            "best_fold": best_fold,
         }
 
         # Risk stratification on best model
@@ -223,8 +239,7 @@ class UnifiedPipeline:
             num_text_features=num_text_features,
         )
         best_model_path = os.path.join(
-            self.output_dirs["models"], 
-            f"fold{best_fold + 1}.pth"
+            self.output_dirs["models"], f"fold{best_fold + 1}.pth"
         )
         model.load_state_dict(torch.load(best_model_path))
 
@@ -232,22 +247,27 @@ class UnifiedPipeline:
         risk_analyzer = UnifiedRiskStratification(
             model, dataset, enable_attribution=enable_attribution
         )
-        risk_df = risk_analyzer.generate_risk_scores(compute_attributions=enable_attribution)
+        risk_df = risk_analyzer.generate_risk_scores(
+            compute_attributions=enable_attribution
+        )
         risk_df = risk_analyzer.stratify_patients(risk_df, n_groups=n_risk_groups)
 
         # Calculate statistics
         stats = risk_analyzer.calculate_statistics(risk_df)
-        
+
         # Analyze top patients if attribution is enabled
         if enable_attribution and "imaging_contribution" in risk_df.columns:
-            top_analysis = risk_analyzer.analyze_top_patients(risk_df, n_top=10, n_bottom=10)
+            top_analysis = risk_analyzer.analyze_top_patients(
+                risk_df, n_top=10, n_bottom=10
+            )
             if top_analysis is not None:
                 top_analysis_path = os.path.join(
-                    self.output_dirs["attribution"], 
-                    "top_bottom_patients_analysis.csv"
+                    self.output_dirs["attribution"], "top_bottom_patients_analysis.csv"
                 )
                 top_analysis.to_csv(top_analysis_path, index=False)
-                logging.info(f"Top/bottom patient analysis saved to: {top_analysis_path}")
+                logging.info(
+                    f"Top/bottom patient analysis saved to: {top_analysis_path}"
+                )
 
         return results, risk_df, stats
 
@@ -355,7 +375,7 @@ __all__ = [
     "create_comprehensive_plots",
     "ModalityAttributionAnalyzer",
     "AttributionResult",
-    "plot_modality_contributions", 
+    "plot_modality_contributions",
     "plot_patient_level_attribution",
     "create_attribution_report",
 ]

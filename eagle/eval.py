@@ -24,7 +24,7 @@ class UnifiedRiskStratification:
         model: UnifiedSurvivalModel,
         dataset: UnifiedSurvivalDataset,
         device: str = "cuda",
-        enable_attribution: bool = False
+        enable_attribution: bool = False,
     ):
         self.model = model
         self.dataset = dataset
@@ -32,7 +32,7 @@ class UnifiedRiskStratification:
         self.model.to(self.device)
         self.model.eval()
         self.enable_attribution = enable_attribution
-        
+
         # Store attribution information if enabled
         self.attribution_scores = []
 
@@ -44,7 +44,7 @@ class UnifiedRiskStratification:
         all_times = []
         all_events = []
         all_ids = []
-        
+
         # Attribution tracking
         all_imaging_contributions = []
         all_text_contributions = []
@@ -60,33 +60,36 @@ class UnifiedRiskStratification:
                 text_feat = batch["text_features"].to(self.device)
 
                 risk_scores, aux_outputs = self.model(
-                    imaging, text_emb, clinical, text_feat,
-                    return_attention_weights=compute_attributions
+                    imaging,
+                    text_emb,
+                    clinical,
+                    text_feat,
+                    return_attention_weights=compute_attributions,
                 )
 
                 all_risks.extend(risk_scores.cpu().numpy().flatten())
                 all_times.extend(batch["survival_time"].numpy())
                 all_events.extend(batch["event"].numpy())
                 all_ids.extend(batch["patient_id"])
-                
+
                 # Compute simple attribution scores based on encoder outputs
                 if compute_attributions and self.enable_attribution:
                     # Get modality embeddings
                     modality_embeddings = self.model.get_modality_embeddings(
                         imaging, text_emb, clinical, text_feat
                     )
-                    
+
                     # Compute contribution scores based on embedding magnitudes
-                    imaging_contrib = modality_embeddings['imaging'].abs().mean(dim=1)
-                    text_contrib = modality_embeddings['text'].abs().mean(dim=1)
-                    clinical_contrib = modality_embeddings['clinical'].abs().mean(dim=1)
-                    
+                    imaging_contrib = modality_embeddings["imaging"].abs().mean(dim=1)
+                    text_contrib = modality_embeddings["text"].abs().mean(dim=1)
+                    clinical_contrib = modality_embeddings["clinical"].abs().mean(dim=1)
+
                     # Normalize to percentages
                     total = imaging_contrib + text_contrib + clinical_contrib
                     imaging_pct = (imaging_contrib / total * 100).cpu().numpy()
                     text_pct = (text_contrib / total * 100).cpu().numpy()
                     clinical_pct = (clinical_contrib / total * 100).cpu().numpy()
-                    
+
                     all_imaging_contributions.extend(imaging_pct)
                     all_text_contributions.extend(text_pct)
                     all_clinical_contributions.extend(clinical_pct)
@@ -100,19 +103,19 @@ class UnifiedRiskStratification:
                 "event": all_events,
             }
         )
-        
+
         # Add attribution scores if computed
         if compute_attributions and all_imaging_contributions:
             risk_df["imaging_contribution"] = all_imaging_contributions
             risk_df["text_contribution"] = all_text_contributions
             risk_df["clinical_contribution"] = all_clinical_contributions
-            
+
             # Log average contributions
             logging.info("\nAverage Modality Contributions:")
             logging.info(f"  Imaging: {np.mean(all_imaging_contributions):.1f}%")
             logging.info(f"  Text: {np.mean(all_text_contributions):.1f}%")
             logging.info(f"  Clinical: {np.mean(all_clinical_contributions):.1f}%")
-        
+
         return risk_df
 
     def stratify_patients(
@@ -145,13 +148,17 @@ class UnifiedRiskStratification:
                 f"{group}: n={len(group_data)}, event_rate={event_rate:.1%}, "
                 f"median_survival={median_surv:.1f}"
             )
-            
+
             # If attribution scores are available, show by group
             if "imaging_contribution" in risk_df.columns:
                 logging.info(f"  Average modality contributions:")
-                logging.info(f"    Imaging: {group_data['imaging_contribution'].mean():.1f}%")
+                logging.info(
+                    f"    Imaging: {group_data['imaging_contribution'].mean():.1f}%"
+                )
                 logging.info(f"    Text: {group_data['text_contribution'].mean():.1f}%")
-                logging.info(f"    Clinical: {group_data['clinical_contribution'].mean():.1f}%")
+                logging.info(
+                    f"    Clinical: {group_data['clinical_contribution'].mean():.1f}%"
+                )
 
         return risk_df
 
@@ -174,67 +181,94 @@ class UnifiedRiskStratification:
         )
         results["c_index"] = c_index
         logging.info(f"\nModel C-index: {c_index:.4f}")
-        
+
         # If attribution scores are available, compute correlations
         if "imaging_contribution" in risk_df.columns:
             results["attribution_stats"] = {
-                "imaging_risk_corr": risk_df["imaging_contribution"].corr(risk_df["risk_score"]),
-                "text_risk_corr": risk_df["text_contribution"].corr(risk_df["risk_score"]),
-                "clinical_risk_corr": risk_df["clinical_contribution"].corr(risk_df["risk_score"]),
+                "imaging_risk_corr": risk_df["imaging_contribution"].corr(
+                    risk_df["risk_score"]
+                ),
+                "text_risk_corr": risk_df["text_contribution"].corr(
+                    risk_df["risk_score"]
+                ),
+                "clinical_risk_corr": risk_df["clinical_contribution"].corr(
+                    risk_df["risk_score"]
+                ),
                 "imaging_event_diff": (
-                    risk_df[risk_df["event"] == 1]["imaging_contribution"].mean() -
-                    risk_df[risk_df["event"] == 0]["imaging_contribution"].mean()
+                    risk_df[risk_df["event"] == 1]["imaging_contribution"].mean()
+                    - risk_df[risk_df["event"] == 0]["imaging_contribution"].mean()
                 ),
                 "text_event_diff": (
-                    risk_df[risk_df["event"] == 1]["text_contribution"].mean() -
-                    risk_df[risk_df["event"] == 0]["text_contribution"].mean()
+                    risk_df[risk_df["event"] == 1]["text_contribution"].mean()
+                    - risk_df[risk_df["event"] == 0]["text_contribution"].mean()
                 ),
                 "clinical_event_diff": (
-                    risk_df[risk_df["event"] == 1]["clinical_contribution"].mean() -
-                    risk_df[risk_df["event"] == 0]["clinical_contribution"].mean()
-                )
+                    risk_df[risk_df["event"] == 1]["clinical_contribution"].mean()
+                    - risk_df[risk_df["event"] == 0]["clinical_contribution"].mean()
+                ),
             }
-            
+
             logging.info("\nModality Contribution Statistics:")
             logging.info("Correlation with risk score:")
-            logging.info(f"  Imaging: {results['attribution_stats']['imaging_risk_corr']:.3f}")
-            logging.info(f"  Text: {results['attribution_stats']['text_risk_corr']:.3f}")
-            logging.info(f"  Clinical: {results['attribution_stats']['clinical_risk_corr']:.3f}")
+            logging.info(
+                f"  Imaging: {results['attribution_stats']['imaging_risk_corr']:.3f}"
+            )
+            logging.info(
+                f"  Text: {results['attribution_stats']['text_risk_corr']:.3f}"
+            )
+            logging.info(
+                f"  Clinical: {results['attribution_stats']['clinical_risk_corr']:.3f}"
+            )
 
         return results
-    
-    def analyze_top_patients(self, risk_df: pd.DataFrame, n_top: int = 10, 
-                           n_bottom: int = 10) -> pd.DataFrame:
+
+    def analyze_top_patients(
+        self, risk_df: pd.DataFrame, n_top: int = 10, n_bottom: int = 10
+    ) -> pd.DataFrame:
         """Analyze attribution patterns for highest and lowest risk patients"""
         if "imaging_contribution" not in risk_df.columns:
             logging.warning("Attribution scores not available for top patient analysis")
             return None
-        
+
         # Get top and bottom risk patients
-        sorted_df = risk_df.sort_values('risk_score', ascending=False)
+        sorted_df = risk_df.sort_values("risk_score", ascending=False)
         top_patients = sorted_df.head(n_top)
         bottom_patients = sorted_df.tail(n_bottom)
-        
+
         # Create analysis summary
-        analysis = pd.DataFrame({
-            'Group': ['High Risk'] * n_top + ['Low Risk'] * n_bottom,
-            'patient_id': list(top_patients['patient_id']) + list(bottom_patients['patient_id']),
-            'risk_score': list(top_patients['risk_score']) + list(bottom_patients['risk_score']),
-            'imaging_contribution': list(top_patients['imaging_contribution']) + list(bottom_patients['imaging_contribution']),
-            'text_contribution': list(top_patients['text_contribution']) + list(bottom_patients['text_contribution']),
-            'clinical_contribution': list(top_patients['clinical_contribution']) + list(bottom_patients['clinical_contribution']),
-            'event': list(top_patients['event']) + list(bottom_patients['event']),
-            'survival_time': list(top_patients['survival_time']) + list(bottom_patients['survival_time'])
-        })
-        
+        analysis = pd.DataFrame(
+            {
+                "Group": ["High Risk"] * n_top + ["Low Risk"] * n_bottom,
+                "patient_id": list(top_patients["patient_id"])
+                + list(bottom_patients["patient_id"]),
+                "risk_score": list(top_patients["risk_score"])
+                + list(bottom_patients["risk_score"]),
+                "imaging_contribution": list(top_patients["imaging_contribution"])
+                + list(bottom_patients["imaging_contribution"]),
+                "text_contribution": list(top_patients["text_contribution"])
+                + list(bottom_patients["text_contribution"]),
+                "clinical_contribution": list(top_patients["clinical_contribution"])
+                + list(bottom_patients["clinical_contribution"]),
+                "event": list(top_patients["event"]) + list(bottom_patients["event"]),
+                "survival_time": list(top_patients["survival_time"])
+                + list(bottom_patients["survival_time"]),
+            }
+        )
+
         # Log summary statistics
         logging.info("\nModality contributions by risk level:")
-        for group in ['High Risk', 'Low Risk']:
-            group_data = analysis[analysis['Group'] == group]
+        for group in ["High Risk", "Low Risk"]:
+            group_data = analysis[analysis["Group"] == group]
             logging.info(f"\n{group} patients (n={len(group_data)}):")
-            logging.info(f"  Average imaging contribution: {group_data['imaging_contribution'].mean():.1f}%")
-            logging.info(f"  Average text contribution: {group_data['text_contribution'].mean():.1f}%")
-            logging.info(f"  Average clinical contribution: {group_data['clinical_contribution'].mean():.1f}%")
+            logging.info(
+                f"  Average imaging contribution: {group_data['imaging_contribution'].mean():.1f}%"
+            )
+            logging.info(
+                f"  Average text contribution: {group_data['text_contribution'].mean():.1f}%"
+            )
+            logging.info(
+                f"  Average clinical contribution: {group_data['clinical_contribution'].mean():.1f}%"
+            )
             logging.info(f"  Event rate: {group_data['event'].mean():.1%}")
-        
+
         return analysis
