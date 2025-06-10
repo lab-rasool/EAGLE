@@ -194,8 +194,8 @@ Based on the experimental results:
 
 | **Metric** | **Value** |
 |------------|-----------|
-| C-index | 0.594 ± 0.037 |
-| Best Baseline | 0.719 (DeepSurv) |
+| C-index | 0.598 ± 0.021 |
+| Best Baseline | 0.722 (CoxPH) |
 | Risk Groups | 3 |
 | Feature Reduction | 99.98% |
 
@@ -210,10 +210,10 @@ The model successfully stratifies patients into three distinct risk groups:
 
 ### Modality Contributions
 
-The multimodal integration shows:
-- **Clinical features**: Often dominant due to staging information
-- **CT imaging**: Provides complementary tumor characteristics
-- **Smoking history**: Strong prognostic factor integrated into clinical embeddings
+Average modality importance across patients:
+- **Clinical Features**: 34.4% (Simple) / 19.4% (Gradient-based)
+- **Text Reports**: 33.7% (Simple) / 31.6% (Gradient-based)
+- **CT Imaging**: 31.9% (Simple) / 49.0% (Gradient-based)
 
 ---
 

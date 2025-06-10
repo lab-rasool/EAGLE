@@ -191,8 +191,8 @@ Based on the experimental results:
 
 | **Metric** | **Value** |
 |------------|-----------|
-| C-index | 0.674 ± 0.063 |
-| Best Baseline | 0.762 (RSF) |
+| C-index | 0.679 ± 0.029 |
+| Best Baseline | 0.776 (RSF) |
 | Risk Groups | 3 |
 | Attribution Available | Yes |
 
@@ -204,10 +204,10 @@ The EAGLE model successfully stratifies patients into three risk groups with dis
 
 ### Modality Contributions
 
-Average modality importance varies by patient risk:
-- **High-risk patients**: Pathology reports dominate (>40%)
-- **Low-risk patients**: Imaging features more important (>35%)
-- **Clinical features**: Consistent contribution (~30%)
+Average modality importance across patients:
+- **Clinical Features**: 34.9% (Simple) / 22.2% (Gradient-based)
+- **Text Reports**: 33.6% (Simple) / 32.0% (Gradient-based)
+- **CT Imaging**: 31.5% (Simple) / 45.8% (Gradient-based)
 
 ---
 

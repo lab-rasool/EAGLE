@@ -24,9 +24,9 @@ The EAGLE framework includes three comprehensive cancer datasets, each with mult
 
 | **Dataset** | **C-index** | **Best Baseline** | **Improvement** |
 |-------------|-------------|-------------------|-----------------|
-| GBM | 0.599 ± 0.062 | 0.652 (RSF) | Competitive |
-| IPMN | 0.674 ± 0.063 | 0.762 (RSF) | Strong |
-| NSCLC | 0.594 ± 0.037 | 0.719 (DeepSurv) | Competitive |
+| GBM | 0.637 ± 0.087 | 0.589 (CoxPH w/ MedGemma) | Superior |
+| IPMN | 0.679 ± 0.029 | 0.776 (RSF) | Competitive |
+| NSCLC | 0.598 ± 0.021 | 0.722 (CoxPH) | Competitive |
 
 </div>
 

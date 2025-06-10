@@ -166,7 +166,7 @@ Based on the experimental results:
 
 | **Metric** | **Value** |
 |------------|-----------|
-| C-index | 0.599 ± 0.062 |
+| C-index | 0.637 ± 0.087 |
 | Risk Stratification | 3 groups |
 | Attribution Available | Yes |
 
@@ -182,9 +182,9 @@ From the risk stratification results:
 ### Modality Contributions
 
 Average modality importance across patients:
-- **Clinical Features**: 38.2%
-- **Text Reports**: 32.1%
-- **MRI Imaging**: 29.7%
+- **MRI Imaging**: 37.5% (Simple) / 50.9% (Gradient-based)
+- **Text Reports**: 43.7% (Simple) / 36.4% (Gradient-based)
+- **Clinical Features**: 18.8% (Simple) / 12.7% (Gradient-based)
 
 The balanced contribution across modalities demonstrates the value of multimodal integration for GBM survival prediction.
 
