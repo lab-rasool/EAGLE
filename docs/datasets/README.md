@@ -187,16 +187,6 @@ Using these datasets, EAGLE demonstrates:
 
 ---
 
-## 🔐 Data Privacy and Ethics
-
-All datasets are:
-- ✅ Fully de-identified
-- ✅ IRB approved for research use
-- ✅ HIPAA compliant
-- ✅ Available for academic research
-
----
-
 ## 📚 Citation
 
 When using these datasets, please cite:
