@@ -1,0 +1,131 @@
+Comprehensive Attribution Analysis Report
+============================================================
+
+Dataset: NSCLC
+Number of patients: 580
+Attribution methods: Simple, Gradient-based, Integrated Gradients
+
+1. AVERAGE CONTRIBUTIONS BY METHOD
+----------------------------------------
+
+Simple:
+  Imaging: 31.9% (±7.5%)
+  Text: 33.7% (±7.5%)
+  Clinical: 34.4% (±9.4%)
+
+Gradient:
+  Imaging: 49.0% (±5.9%)
+  Text: 31.6% (±4.9%)
+  Clinical: 19.4% (±5.8%)
+
+Integrated Gradients:
+  Imaging: 0.0% (±0.0%)
+  Text: 92.0% (±3.9%)
+  Clinical: 8.0% (±3.9%)
+
+2. RISK SCORE CORRELATIONS
+----------------------------------------
+
+Simple:
+  Imaging: -0.089
+  Text: -0.091
+  Clinical: 0.143
+
+Gradient:
+  Imaging: -0.122
+  Text: 0.059
+  Clinical: 0.075
+
+Integrated Gradients:
+  Imaging: -0.058
+  Text: -0.082
+  Clinical: 0.082
+
+3. METHOD AGREEMENT (CORRELATIONS)
+----------------------------------------
+
+Imaging modality:
+  Simple vs Gradient: 0.540
+  Simple vs IG: 0.134
+  Gradient vs IG: 0.325
+
+Text modality:
+  Simple vs Gradient: 0.434
+  Simple vs IG: -0.385
+  Gradient vs IG: 0.112
+
+Clinical modality:
+  Simple vs Gradient: 0.656
+  Simple vs IG: -0.157
+  Gradient vs IG: 0.239
+
+4. TOP HIGH-RISK PATIENTS
+----------------------------------------
+
+Patient 746881 (Risk: 0.383):
+  Simple:    Img=29.9%, Txt=30.9%, Clin=39.3%
+  Gradient:  Img=46.5%, Txt=33.6%, Clin=19.9%
+  IG:        Img=0.0%, Txt=88.9%, Clin=11.1%
+
+Patient 673736 (Risk: 0.375):
+  Simple:    Img=28.4%, Txt=28.6%, Clin=43.1%
+  Gradient:  Img=44.6%, Txt=28.8%, Clin=26.7%
+  IG:        Img=0.1%, Txt=89.0%, Clin=10.9%
+
+Patient 332717 (Risk: 0.373):
+  Simple:    Img=26.1%, Txt=26.7%, Clin=47.2%
+  Gradient:  Img=37.6%, Txt=31.8%, Clin=30.6%
+  IG:        Img=0.0%, Txt=88.6%, Clin=11.3%
+
+Patient 576367 (Risk: 0.372):
+  Simple:    Img=40.3%, Txt=35.4%, Clin=24.3%
+  Gradient:  Img=50.9%, Txt=37.6%, Clin=11.5%
+  IG:        Img=0.0%, Txt=91.6%, Clin=8.4%
+
+Patient 1172368 (Risk: 0.367):
+  Simple:    Img=41.2%, Txt=33.4%, Clin=25.4%
+  Gradient:  Img=55.3%, Txt=32.0%, Clin=12.7%
+  IG:        Img=0.0%, Txt=92.6%, Clin=7.4%
+
+Patient 625962 (Risk: 0.365):
+  Simple:    Img=46.7%, Txt=26.8%, Clin=26.5%
+  Gradient:  Img=52.9%, Txt=33.3%, Clin=13.8%
+  IG:        Img=0.0%, Txt=96.1%, Clin=3.9%
+
+Patient 680761 (Risk: 0.360):
+  Simple:    Img=48.2%, Txt=26.6%, Clin=25.2%
+  Gradient:  Img=51.9%, Txt=33.0%, Clin=15.1%
+  IG:        Img=0.0%, Txt=90.2%, Clin=9.7%
+
+Patient 609230 (Risk: 0.348):
+  Simple:    Img=28.8%, Txt=33.3%, Clin=37.9%
+  Gradient:  Img=44.1%, Txt=32.3%, Clin=23.6%
+  IG:        Img=0.0%, Txt=90.1%, Clin=9.8%
+
+Patient 586756 (Risk: 0.340):
+  Simple:    Img=29.6%, Txt=27.5%, Clin=43.0%
+  Gradient:  Img=41.5%, Txt=31.2%, Clin=27.2%
+  IG:        Img=0.0%, Txt=95.6%, Clin=4.4%
+
+Patient 776366 (Risk: 0.337):
+  Simple:    Img=39.1%, Txt=36.4%, Clin=24.5%
+  Gradient:  Img=52.1%, Txt=36.1%, Clin=11.7%
+  IG:        Img=0.1%, Txt=91.6%, Clin=8.3%
+
+5. STATISTICAL ANALYSIS
+----------------------------------------
+
+Simple - Differences by outcome:
+  Imaging: p=0.0139 (significant), mean diff=-1.4%
+  Text: p=0.9393, mean diff=-0.3%
+  Clinical: p=0.0703, mean diff=1.7%
+
+Gradient - Differences by outcome:
+  Imaging: p=0.0006 (significant), mean diff=-1.7%
+  Text: p=0.3029, mean diff=0.5%
+  Clinical: p=0.0221 (significant), mean diff=1.2%
+
+Integrated Gradients - Differences by outcome:
+  Imaging: p=0.1796, mean diff=-0.0%
+  Text: p=0.6332, mean diff=0.0%
+  Clinical: p=0.6303, mean diff=-0.0%

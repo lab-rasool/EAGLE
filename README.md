@@ -117,14 +117,14 @@ pip install -r requirements.txt
 python main.py --dataset GBM
 
 # Enable attribution analysis for interpretability
-python main.py --dataset NSCLC --analyze-attribution
+python main.py --dataset NSCLC --comprehensive-attribution
 
 # Run with custom configuration
 python main.py --dataset IPMN \
                --epochs 150 \
                --batch-size 24 \
                --lr 5e-5 \
-               --analyze-attribution
+               --comprehensive-attribution
 ```
 
 ### 🔬 Advanced Usage
@@ -134,7 +134,7 @@ python main.py --dataset IPMN \
 python main.py --mode baseline --dataset GBM
 
 # Run complete analysis (EAGLE + all baselines)
-python main.py --mode all --analyze-attribution
+python main.py --mode all --comprehensive-attribution
 
 # Use MedGemma embeddings
 python main.py --dataset NSCLC \
@@ -320,7 +320,7 @@ results/[Dataset]/[Timestamp]/
 | `--epochs` | Number of training epochs | 200 |
 | `--batch-size` | Batch size for training | 16 |
 | `--lr` | Learning rate | 1e-4 |
-| `--analyze-attribution` | Enable attribution analysis | False |
+| `--comprehensive-attribution` | Enable attribution analysis | False |
 | `--top-patients` | Number of patients for detailed analysis | 5 |
 | `--output-dir` | Output directory | results/ |
 
