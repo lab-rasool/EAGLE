@@ -25,6 +25,7 @@ class UnifiedRiskStratification:
         dataset: UnifiedSurvivalDataset,
         device: str = "cuda",
         enable_attribution: bool = False,
+        enable_comprehensive_attribution: bool = False,
     ):
         self.model = model
         self.dataset = dataset
@@ -32,12 +33,82 @@ class UnifiedRiskStratification:
         self.model.to(self.device)
         self.model.eval()
         self.enable_attribution = enable_attribution
+        self.enable_comprehensive_attribution = enable_comprehensive_attribution
 
         # Store attribution information if enabled
         self.attribution_scores = []
 
     def generate_risk_scores(self, compute_attributions: bool = False) -> pd.DataFrame:
         """Generate risk scores for all patients with optional attribution analysis"""
+        
+        # If comprehensive attribution is enabled, use the attribution analyzer
+        if self.enable_comprehensive_attribution and compute_attributions:
+            from .attribution import ModalityAttributionAnalyzer
+            
+            logging.info("Running comprehensive attribution analysis...")
+            analyzer = ModalityAttributionAnalyzer(self.model, self.dataset, self.device)
+            attribution_df = analyzer.analyze_cohort_comprehensive()
+            
+            logging.info(f"Attribution analysis completed for {len(attribution_df)} patients")
+            
+            # Get risk scores for consistency
+            loader = DataLoader(self.dataset, batch_size=32, shuffle=False)
+            all_risks = []
+            all_times = []
+            all_events = []
+            all_ids = []
+            
+            with torch.no_grad():
+                for batch in tqdm(loader, desc="Computing risk scores"):
+                    imaging = batch["imaging_features"].to(self.device)
+                    text_emb = {
+                        k: v.to(self.device) for k, v in batch["text_embeddings"].items()
+                    }
+                    clinical = batch["clinical_features"].to(self.device)
+                    text_feat = batch["text_features"].to(self.device)
+                    
+                    risk_scores, _ = self.model(imaging, text_emb, clinical, text_feat)
+                    
+                    all_risks.extend(risk_scores.cpu().numpy().flatten())
+                    all_times.extend(batch["survival_time"].numpy())
+                    all_events.extend(batch["event"].numpy())
+                    all_ids.extend(batch["patient_id"])
+            
+            # Create risk dataframe
+            risk_df = pd.DataFrame({
+                "patient_id": all_ids,
+                "risk_score": all_risks,
+                "survival_time": all_times,
+                "event": all_events,
+            })
+            
+            # Merge with comprehensive attribution results
+            # Drop duplicate columns from attribution_df before merging
+            merge_cols = [col for col in attribution_df.columns if col not in ['risk_score', 'survival_time', 'event'] or col == 'patient_id']
+            risk_df = risk_df.merge(attribution_df[merge_cols], on="patient_id", how="left")
+            
+            # Add simple attribution columns for backward compatibility
+            if "simple_imaging" in risk_df.columns:
+                risk_df["imaging_contribution"] = risk_df["simple_imaging"]
+                risk_df["text_contribution"] = risk_df["simple_text"]
+                risk_df["clinical_contribution"] = risk_df["simple_clinical"]
+                
+            # Log summary of comprehensive attribution results
+            if all(col in risk_df.columns for col in ["simple_imaging", "gradient_imaging", "ig_imaging"]):
+                logging.info("\nComprehensive Attribution Summary:")
+                logging.info(f"  Simple:    Imaging={risk_df['simple_imaging'].mean():.1f}%, Text={risk_df['simple_text'].mean():.1f}%, Clinical={risk_df['simple_clinical'].mean():.1f}%")
+                logging.info(f"  Gradient:  Imaging={risk_df['gradient_imaging'].mean():.1f}%, Text={risk_df['gradient_text'].mean():.1f}%, Clinical={risk_df['gradient_clinical'].mean():.1f}%")
+                logging.info(f"  IG:        Imaging={risk_df['ig_imaging'].mean():.1f}%, Text={risk_df['ig_text'].mean():.1f}%, Clinical={risk_df['ig_clinical'].mean():.1f}%")
+            
+            # Verify required columns exist
+            required_cols = ["patient_id", "risk_score", "survival_time", "event"]
+            missing_cols = [col for col in required_cols if col not in risk_df.columns]
+            if missing_cols:
+                raise ValueError(f"Missing required columns after merge: {missing_cols}")
+            
+            return risk_df
+        
+        # Original simple attribution path
         loader = DataLoader(self.dataset, batch_size=32, shuffle=False)
 
         all_risks = []

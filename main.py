@@ -3,7 +3,7 @@
 EAGLE: Efficient Alignment of Generalized Latent Embeddings
 Main script for training EAGLE models and running comparative analysis
 
-python main.py --mode all --analyze-attribution
+python main.py --mode all --comprehensive-attribution
 """
 
 import argparse
@@ -1188,9 +1188,21 @@ def train_eagle_models(args):
 
         # Train model
         pipeline = UnifiedPipeline(config, model_config, output_dirs=output_dirs)
-        eagle_results, risk_df, stats = pipeline.run(
-            n_folds=5, n_risk_groups=3, enable_attribution=args.analyze_attribution
-        )
+
+        # Enable comprehensive attribution if requested
+        if args.comprehensive_attribution:
+            # Run with comprehensive attribution
+            eagle_results, risk_df, stats = pipeline.run(
+                n_folds=5,
+                n_risk_groups=3,
+                enable_attribution=True,
+                enable_comprehensive_attribution=True,
+            )
+        else:
+            # Run with simple attribution only
+            eagle_results, risk_df, stats = pipeline.run(
+                n_folds=5, n_risk_groups=3, enable_attribution=args.analyze_attribution
+            )
 
         # Store results
         results.append(
@@ -1234,24 +1246,50 @@ def train_eagle_models(args):
         plot_dataset_specific(risk_df, dataset, output_dir=str(output_dirs["figures"]))
 
         # Generate attribution plots if enabled
-        if args.analyze_attribution and "imaging_contribution" in risk_df.columns:
+        if (
+            args.analyze_attribution or args.comprehensive_attribution
+        ) and "imaging_contribution" in risk_df.columns:
             logging.info(f"  Generating attribution visualizations for {dataset}...")
             from eagle.attribution import (
                 plot_modality_contributions,
                 plot_patient_level_attribution,
+                plot_comprehensive_attribution_comparison,
+                create_comprehensive_attribution_report,
             )
 
             # Plot modality contributions
-            attr_path = output_dirs["attribution"] / "modality_contributions.png"
+            attr_path = output_dirs["attribution"] / "modality_contributions.pdf"
             plot_modality_contributions(
                 risk_df, save_path=str(attr_path), dataset_name=dataset
             )
 
             # Plot patient-level attribution
             patient_attr_path = (
-                output_dirs["attribution"] / "patient_level_attribution.png"
+                output_dirs["attribution"] / "patient_level_attribution.pdf"
             )
             plot_patient_level_attribution(risk_df, save_path=str(patient_attr_path))
+
+            # If comprehensive attribution was used, generate additional visualizations
+            if args.comprehensive_attribution and "simple_imaging" in risk_df.columns:
+                logging.info(
+                    f"  Generating comprehensive attribution analysis for {dataset}..."
+                )
+
+                # Comprehensive comparison plot
+                comp_path = (
+                    output_dirs["attribution"]
+                    / "comprehensive_attribution_comparison.pdf"
+                )
+                plot_comprehensive_attribution_comparison(
+                    risk_df, save_path=str(comp_path), dataset_name=dataset
+                )
+
+                # Detailed report
+                create_comprehensive_attribution_report(
+                    risk_df,
+                    output_dir=str(output_dirs["attribution"]),
+                    dataset_name=dataset,
+                )
 
         # Generate EAGLE embeddings
         if args.generate_embeddings:
@@ -1353,6 +1391,11 @@ def main():
     )
     parser.add_argument(
         "--analyze-attribution", action="store_true", help="Run attribution analysis"
+    )
+    parser.add_argument(
+        "--comprehensive-attribution",
+        action="store_true",
+        help="Run comprehensive attribution analysis with all three methods (Simple, Gradient, Integrated Gradients)",
     )
     parser.add_argument(
         "--generate-embeddings",

@@ -76,7 +76,8 @@ class UnifiedPipeline:
         self.model_config = model_config
 
     def run(
-        self, n_folds: int = 5, n_risk_groups: int = 3, enable_attribution: bool = False
+        self, n_folds: int = 5, n_risk_groups: int = 3, enable_attribution: bool = False,
+        enable_comprehensive_attribution: bool = False
     ):
         """Run the complete pipeline with optional attribution analysis"""
         import logging
@@ -100,6 +101,8 @@ class UnifiedPipeline:
         logging.info(f"Running {self.dataset_config.name} analysis")
         if enable_attribution:
             logging.info("Attribution analysis enabled")
+        if enable_comprehensive_attribution:
+            logging.info("Comprehensive attribution analysis enabled (all three methods)")
 
         # Load data
         df = pd.read_parquet(self.dataset_config.data_path)
@@ -245,7 +248,9 @@ class UnifiedPipeline:
 
         # Run risk stratification with attribution if enabled
         risk_analyzer = UnifiedRiskStratification(
-            model, dataset, enable_attribution=enable_attribution
+            model, dataset, 
+            enable_attribution=enable_attribution,
+            enable_comprehensive_attribution=enable_comprehensive_attribution
         )
         risk_df = risk_analyzer.generate_risk_scores(
             compute_attributions=enable_attribution
