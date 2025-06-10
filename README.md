@@ -99,7 +99,7 @@ EAGLE is a multimodal deep learning framework designed for survival prediction i
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/EAGLE.git
+git clone https://github.com/lab-rasool/EAGLE.git
 cd EAGLE
 
 # Create a virtual environment (recommended)
@@ -378,16 +378,7 @@ For detailed documentation, please visit our [Documentation Site](https://eagle-
 If you use EAGLE in your research, please cite our paper:
 
 ```bibtex
-@article{eagle2024,
-  title={EAGLE: Efficient Alignment of Generalized Latent Embeddings for 
-         Multimodal Survival Prediction},
-  author={Your Name and Contributors},
-  journal={Medical Image Analysis},
-  year={2024},
-  volume={XX},
-  pages={XX-XX},
-  doi={10.1016/j.media.2024.XXXXX}
-}
+... Pending publication ...
 ```
 
 ---
