@@ -1233,10 +1233,14 @@ def train_eagle_models(args):
 
         # Generate Kaplan-Meier curves
         km_path = output_dirs["figures"] / "kaplan_meier_curves.png"
+        km_kwargs = {}
+        if dataset == "IPMN":
+            km_kwargs["legend_loc"] = "lower left"
         plot_km_curves(
             risk_df,
             title=f"{dataset} Risk-Stratified Survival Curves",
             save_path=str(km_path),
+            **km_kwargs,
         )
 
         # Generate comprehensive plots
